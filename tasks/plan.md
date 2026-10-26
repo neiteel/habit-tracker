@@ -12,7 +12,7 @@
 
 **不在本計畫**：
 - magic link 登入、`reminders` 模組：已延後（D10）。
-- `export` 模組、刪除帳號：之後另開計畫。
+- 刪除帳號：之後另開計畫。（`export` 已在 T17 完成。）
 
 ## 架構決策
 - **連續紀錄規則先做，而且獨立於其他工作**（Task 2–6）。它是純函式，不碰資料庫，也是邏輯最重、最容易出錯的部分，越早做越早發現問題。可以和 Task 7–8 並行。
@@ -199,6 +199,15 @@ T1 測試指令修正
 **驗證**：手動在手機尺寸和 reduced-motion 下測試
 **依賴**：T10、T11
 **檔案**：`src/routes/__root.tsx`、`src/routes/index.tsx`、`src/routes/habits.$habitId.tsx`
+
+#### Task 17：匯出 JSON（S）
+**說明**：照 [SPEC-export.md](../SPEC-export.md) 實作。`reminder` 欄位等 reminders 上線再加。
+**驗收**
+- [x] 匯出只含該使用者的 habit、schedule、check-in 和時間設定，不含其他使用者的資料或任何 token。
+- [ ] `/settings` 按「匯出 JSON」會下載 `habit-tracker-YYYY-MM-DD.json`；失敗時顯示 toast。
+**驗證**：`pnpm test:db`；手動在 `/settings` 按一次
+**依賴**：T15
+**檔案**：`src/server/db.ts`、`src/habits.ts`、`src/routes/settings.tsx`
 
 ### Checkpoint C：完成
 - [ ] `pnpm typecheck && pnpm test && pnpm test:db` 全部通過，`pnpm build` 成功。

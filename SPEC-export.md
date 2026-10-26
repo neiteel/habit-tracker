@@ -6,7 +6,7 @@
 使用者可以一鍵下載自己的全部資料，資料是可以帶走的。
 
 ## 設計
-- server function `exportData()`：先 `requireUser()`，再查出該使用者的 `time_settings`、`habit`、`habit_schedule`、`check_in` 和 `reminder_setting`。
+- server function `exportData()`：先 `requireUser()`，再查出該使用者的 `time_settings`、`habit`、`habit_schedule`和 `check_in`。
 - 回傳 JSON；客戶端用 `Blob` 加 `<a download>` 存成 `habit-tracker-YYYY-MM-DD.json`。
 - 格式：
 ```json
@@ -15,7 +15,6 @@
   "exportedAt": "2026-10-26T08:00:00Z",
   "user": { "email": "…", "createdAt": "…" },
   "timeSettings": { "timeZone": "Asia/Taipei", "dayStartMinutes": 0 },
-  "reminder": { "enabled": false, "time": null },
   "habits": [
     { "id": "…", "name": "…", "stackCue": null, "createdOn": "2026-10-01",
       "schedules": [{ "effectiveFrom": "2026-10-01", "kind": "daily" }],
@@ -23,6 +22,7 @@
   ]
 }
 ```
+- `reminder` 欄位等 reminders 模組（D10）上線後再加，並把 `version` 升成 2。
 - **不匯出**：session、OAuth token、推播訂閱的金鑰。連續紀錄也不匯出，因為可以從 `checkIns` 算回來。
 
 ## 畫面

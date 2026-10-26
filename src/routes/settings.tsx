@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
-import { getTime, saveDayStart } from '../habits'
+import { exportData, getTime, saveDayStart } from '../habits'
 import { toasts } from '../toast'
 
 const hours = [0, 1, 2, 3, 4, 5, 6]
@@ -15,6 +15,7 @@ function Settings() {
   const time = Route.useLoaderData()
   const router = useRouter()
   const [pending, setPending] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const line = (label: string, value: string) => (
     <div className="line"><span>{label}</span><span className="leader" /><span className="value">{value}</span></div>
   )
@@ -60,6 +61,32 @@ function Settings() {
           </select>
         </label>
         <p className="meta">時區跟著這台裝置自動更新。熬夜的話，把一天的開始往後調，凌晨的打卡就會算在前一天。</p>
+        <hr className="rule" />
+        <span className="label">資料</span>
+        <button
+          type="button"
+          className="btn ghost"
+          disabled={exporting}
+          onClick={async () => {
+            setExporting(true)
+            try {
+              const blob = new Blob([JSON.stringify(await exportData(), null, 2)], { type: 'application/json' })
+              const a = document.createElement('a')
+              a.href = URL.createObjectURL(blob)
+              a.download = `habit-tracker-${time.today}.json`
+              a.click()
+              // Revoke after the click has handed the URL to the download, not before.
+              setTimeout(() => URL.revokeObjectURL(a.href))
+            } catch {
+              toasts.add({ title: '匯出失敗', description: '請再試一次。' })
+            } finally {
+              setExporting(false)
+            }
+          }}
+        >
+          {exporting ? '匯出中…' : '匯出 JSON'}
+        </button>
+        <p className="meta">下載你全部的習慣、打卡紀錄和設定。</p>
       </section>
     </div>
   )

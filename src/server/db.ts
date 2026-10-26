@@ -6,7 +6,7 @@ import type { HabitInput } from '../habit-input.ts'
 import type { Schedule, TimeSettings } from '../streak.ts'
 import * as schema from './schema.ts'
 
-const { habit, habitSchedule, checkIn, timeSettings } = schema
+const { user, habit, habitSchedule, checkIn, timeSettings } = schema
 
 export const orm = drizzle(process.env.DATABASE_URL!, { schema })
 
@@ -35,7 +35,7 @@ async function find(userId: string, id?: string): Promise<Habit[]> {
   const rows = await orm.query.habit.findMany({
     // Every query is scoped to the signed-in user, so one user's ids are useless to another.
     where: id ? and(eq(habit.userId, userId), eq(habit.id, id)) : eq(habit.userId, userId),
-    with: { schedules: true, checkIns: { columns: { onDate: true, createdAt: true }, orderBy: asc(checkIn.onDate) } },
+    with: { schedules: { orderBy: asc(habitSchedule.effectiveFrom) }, checkIns: { columns: { onDate: true, createdAt: true }, orderBy: asc(checkIn.onDate) } },
     orderBy: asc(habit.createdAt),
   })
   return rows.map((r) => ({
@@ -117,6 +117,21 @@ export const db = {
       where time_settings.user_id = ${userId} and prev.time_zone <> ${timeZone}
       returning prev.time_zone as "from"`)
     return rows.length ? { saved: true, from: rows[0]!.from } : { saved: false, from: undefined }
+  },
+  /** Everything the user owns, in the SPEC-export shape. No sessions, accounts or tokens. */
+  async exportData(userId: string) {
+    const [[owner], time, habits] = await Promise.all([
+      orm.select({ email: user.email, createdAt: user.createdAt }).from(user).where(eq(user.id, userId)),
+      db.timeSettings(userId),
+      find(userId),
+    ])
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      user: { email: owner!.email, createdAt: owner!.createdAt.toISOString() },
+      timeSettings: time ?? null,
+      habits: habits.map(({ recordedAt, ...h }) => h),
+    }
   },
   async remove(userId: string, id: string) {
     if (!isId(id)) return false

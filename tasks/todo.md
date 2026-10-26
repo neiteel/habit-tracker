@@ -19,3 +19,4 @@
 - [x] T15 時間設定
 - [x] T16 回饋動畫
 - [ ] Checkpoint C：完成（和你審核）
+- [x] T17 匯出 JSON（export 模組）

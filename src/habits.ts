@@ -121,3 +121,8 @@ export const deleteHabit = createServerFn({ method: 'POST' })
     const user = await requireUser()
     if (!(await db.remove(user.id, data.id))) throw notFound()
   })
+
+export const exportData = createServerFn({ method: 'GET' }).handler(async () => {
+  const user = await requireUser()
+  return db.exportData(user.id)
+})

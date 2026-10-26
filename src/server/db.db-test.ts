@@ -153,3 +153,25 @@ test('store: a malformed id is just a missing habit', async () => {
   await newUser('u-malformed')
   assert.equal(await store.get('u-malformed', 'not-a-uuid'), undefined)
 })
+
+test('store: an export holds only the owner’s habits, schedules, check-ins and settings, and no secrets', async () => {
+  await newUser('u-exp')
+  await newUser('u-exp-other')
+  await db.insert(schema.session).values({ id: 's-exp', userId: 'u-exp', token: 'secret-token', expiresAt: new Date(), updatedAt: new Date() })
+  await store.saveTimeSettings('u-exp', { timeZone: 'Asia/Taipei', dayStartMinutes: 240 })
+  const h = await store.create('u-exp', { name: 'Read', stackCue: 'after dinner', createdOn: '2026-10-01', schedule: { kind: 'daily' } })
+  await store.update('u-exp', h.id, { name: 'Read', stackCue: 'after dinner', schedule: { kind: 'weekly', weeklyTarget: 3 } }, '2026-10-20')
+  await store.setCheckIn('u-exp', h.id, '2026-10-02', true)
+  await store.create('u-exp-other', { name: 'Not mine', createdOn: '2026-10-01', schedule: { kind: 'daily' } })
+
+  const out = await store.exportData('u-exp')
+  assert.equal(out.version, 1)
+  assert.equal(out.user.email, 'u-exp@test.local')
+  assert.deepEqual(out.timeSettings, { timeZone: 'Asia/Taipei', dayStartMinutes: 240 })
+  assert.deepEqual(out.habits, [{
+    id: h.id, name: 'Read', stackCue: 'after dinner', createdOn: '2026-10-01',
+    schedules: [{ effectiveFrom: '2026-10-01', kind: 'daily' }, { effectiveFrom: '2026-10-20', kind: 'weekly', weeklyTarget: 3 }],
+    checkIns: ['2026-10-02'],
+  }])
+  assert.doesNotMatch(JSON.stringify(out), /secret-token|token|Not mine/)
+})
