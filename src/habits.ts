@@ -64,6 +64,15 @@ export const createHabit = createServerFn({ method: 'POST' })
     return view(await db.create(user.id, { ...data, createdOn: localDay(new Date(), DEFAULT_TIME) }))
   })
 
+export const updateHabit = createServerFn({ method: 'POST' })
+  .validator(habitInput.extend({ id }))
+  .handler(async ({ data: { id, ...input } }) => {
+    const user = await requireUser()
+    const h = await db.update(user.id, id, input, localDay(new Date(), DEFAULT_TIME))
+    if (!h) throw notFound()
+    return view(h)
+  })
+
 export const setCheckIn = createServerFn({ method: 'POST' })
   .validator(z.object({ id, date: isoDay, done: z.boolean() }))
   .handler(async ({ data }) => {

@@ -1,19 +1,24 @@
 import { useState } from 'react'
-import { createHabit } from './habits'
+import { createHabit, updateHabit } from './habits'
 import { habitInput } from './habit-input'
+import type { Schedule } from './streak'
 
-type Kind = 'daily' | 'weekly' | 'interval'
+type Kind = Schedule['kind']
+type Editing = { id: string; name: string; stackCue: string | null; schedule: Schedule; streak: number; unit: string }
 
-export function HabitForm({ onSaved }: { onSaved: () => void }) {
-  const [kind, setKind] = useState<Kind>('daily')
+/** Adds a habit, or edits one when `habit` is given (new frequencies apply from today, SPEC-habits §6). */
+export function HabitForm({ habit, onSaved }: { habit?: Editing; onSaved: () => void }) {
+  const initial = habit?.schedule
+  const [kind, setKind] = useState<Kind>(initial?.kind ?? 'daily')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  const endsStreak = habit && kind !== initial!.kind && habit.streak > 0
 
   return (
     <div className="sheet">
       <form
         className="receipt form"
-        aria-labelledby="new-habit-title"
+        aria-labelledby="habit-form-title"
         onSubmit={async (e) => {
           e.preventDefault()
           const form = e.currentTarget // React clears currentTarget once the handler awaits
@@ -25,24 +30,27 @@ export function HabitForm({ onSaved }: { onSaved: () => void }) {
           setError('')
           setPending(true)
           try {
-            await createHabit({ data: parsed.data })
-            form.reset()
-            setKind('daily')
+            if (habit) await updateHabit({ data: { ...parsed.data, id: habit.id } })
+            else {
+              await createHabit({ data: parsed.data })
+              form.reset()
+              setKind('daily')
+            }
             onSaved()
           } catch {
-            setError('新增失敗，請再試一次。')
+            setError(habit ? '儲存失敗，請再試一次。' : '新增失敗，請再試一次。')
           } finally {
             setPending(false)
           }
         }}
       >
         <header className="masthead">
-          <span className="eyebrow">New Item</span>
-          <h2 id="new-habit-title">新增習慣</h2>
+          <span className="eyebrow">{habit ? 'Edit Item' : 'New Item'}</span>
+          <h2 id="habit-form-title">{habit ? '編輯習慣' : '新增習慣'}</h2>
         </header>
         <label className="field">
           <span className="label">名稱</span>
-          <input name="name" required maxLength={80} placeholder="例如：閱讀 20 頁" />
+          <input name="name" required maxLength={80} placeholder="例如：閱讀 20 頁" defaultValue={habit?.name} />
         </label>
         <label className="field">
           <span className="label">頻率</span>
@@ -55,21 +63,30 @@ export function HabitForm({ onSaved }: { onSaved: () => void }) {
         {kind === 'weekly' && (
           <label className="field">
             <span className="label">次數</span>
-            <span className="inline">每週 <input key="weekly" name="n" type="number" inputMode="numeric" required min={1} max={7} defaultValue={3} /> 次</span>
+            <span className="inline">
+              每週 <input key="weekly" name="n" type="number" inputMode="numeric" required min={1} max={7}
+                defaultValue={initial?.kind === 'weekly' ? initial.weeklyTarget : 3} /> 次
+            </span>
           </label>
         )}
         {kind === 'interval' && (
           <label className="field">
             <span className="label">間隔</span>
-            <span className="inline">每隔 <input key="interval" name="n" type="number" inputMode="numeric" required min={2} max={30} defaultValue={3} /> 天</span>
+            <span className="inline">
+              每隔 <input key="interval" name="n" type="number" inputMode="numeric" required min={2} max={30}
+                defaultValue={initial?.kind === 'interval' ? initial.intervalDays : 3} /> 天
+            </span>
           </label>
+        )}
+        {endsStreak && (
+          <p className="alert" role="status">換成不同的頻率，目前 {habit.streak} {habit.unit}的連續紀錄會結束，打卡歷史會保留。</p>
         )}
         <label className="field">
           <span className="label">習慣疊加 · 選填</span>
-          <input name="stackCue" maxLength={120} placeholder="例如：刷完牙後" />
+          <input name="stackCue" maxLength={120} placeholder="例如：刷完牙後" defaultValue={habit?.stackCue ?? ''} />
         </label>
         {error && <p className="alert" role="alert">{error}</p>}
-        <button className="btn" disabled={pending}>{pending ? '列印中…' : '新增'}</button>
+        <button className="btn" disabled={pending}>{pending ? '列印中…' : habit ? '儲存' : '新增'}</button>
       </form>
     </div>
   )

@@ -94,6 +94,26 @@ test('store: a check-in recorded after its day counts as backfilled', async () =
   assert.deepEqual([after!.checkIns, after!.backfilled], [['2026-09-02'], ['2026-09-02']])
 })
 
+test('store: editing renames and changes the cue; an unchanged schedule adds no version', async () => {
+  await newUser('u-edit')
+  const h = await store.create('u-edit', { name: 'Read', createdOn: '2026-10-01', schedule: { kind: 'daily' } })
+  const e = await store.update('u-edit', h.id, { name: 'Read 30 pages', stackCue: 'after dinner', schedule: { kind: 'daily' } }, '2026-10-26')
+  assert.deepEqual([e!.name, e!.stackCue, e!.schedules.length], ['Read 30 pages', 'after dinner', 1])
+  const cleared = await store.update('u-edit', h.id, { name: 'Read 30 pages', schedule: { kind: 'daily' } }, '2026-10-26')
+  assert.equal(cleared!.stackCue, null)
+})
+
+test('store: a frequency change starts a new version today; a second change the same day replaces it', async () => {
+  await newUser('u-sched')
+  const h = await store.create('u-sched', { name: 'Gym', createdOn: '2026-10-01', schedule: { kind: 'weekly', weeklyTarget: 3 } })
+  await store.update('u-sched', h.id, { name: 'Gym', schedule: { kind: 'weekly', weeklyTarget: 4 } }, '2026-10-26')
+  const e = await store.update('u-sched', h.id, { name: 'Gym', schedule: { kind: 'daily' } }, '2026-10-26')
+  assert.deepEqual(e!.schedules, [
+    { effectiveFrom: '2026-10-01', kind: 'weekly', weeklyTarget: 3 },
+    { effectiveFrom: '2026-10-26', kind: 'daily' },
+  ])
+})
+
 test('store: one user cannot see, check in or delete another user\'s habit', async () => {
   await newUser('u-alice')
   await newUser('u-bob')
@@ -102,7 +122,9 @@ test('store: one user cannot see, check in or delete another user\'s habit', asy
   assert.equal(await store.get('u-bob', h.id), undefined)
   assert.equal(await store.setCheckIn('u-bob', h.id, '2026-10-26', true), undefined)
   assert.equal(await store.remove('u-bob', h.id), false)
+  assert.equal(await store.update('u-bob', h.id, { name: 'hijacked', schedule: { kind: 'daily' } }, '2026-10-26'), undefined)
   assert.deepEqual((await store.get('u-alice', h.id))!.checkIns, []) // untouched
+  assert.equal((await store.get('u-alice', h.id))!.name, 'Alice only')
   assert.equal(await store.remove('u-alice', h.id), true)
   assert.equal(await store.get('u-alice', h.id), undefined)
 })

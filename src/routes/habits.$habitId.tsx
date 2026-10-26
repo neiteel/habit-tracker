@@ -1,7 +1,9 @@
 // SSR mode: full. A shareable, linkable page whose content is fully known on the server.
 import { Link, createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
+import { AlertDialog } from '@base-ui/react/alert-dialog'
 import { useState } from 'react'
 import { z } from 'zod'
+import { HabitForm } from '../habit-form'
 import { deleteHabit, getHabit, setCheckIn } from '../habits'
 import { canCheckIn, dayStatus, frozenDates, monthGrid } from '../streak'
 
@@ -36,6 +38,7 @@ function HabitPage() {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [editing, setEditing] = useState(false)
 
   const thisMonth = habit.today.slice(0, 7)
   const firstMonth = habit.createdOn.slice(0, 7)
@@ -69,6 +72,7 @@ function HabitPage() {
   )
 
   return (
+    <>
     <div className="sheet">
       <section className="receipt stack" aria-labelledby="habit-title">
         <header className="masthead">
@@ -130,18 +134,48 @@ function HabitPage() {
         </p>
         <p className="meta footnote">今天、昨天和前天可以點選打卡或補簽</p>
 
-        <button
-          className="btn ghost"
-          onClick={async () => {
-            // shortcut: native confirm until T13 brings the styled confirmation dialog.
-            if (!confirm(`刪除「${habit.name}」？打卡紀錄會一起刪除。`)) return
-            await deleteHabit({ data: { id: habit.id } })
-            navigate({ to: '/', search: { filter: 'all' } })
-          }}
-        >
-          刪除習慣
-        </button>
+        <div className="actions">
+          <button className="btn ghost" aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
+            {editing ? '取消編輯' : '編輯'}
+          </button>
+          <AlertDialog.Root>
+            <AlertDialog.Trigger className="btn ghost">刪除</AlertDialog.Trigger>
+            <AlertDialog.Portal>
+              <AlertDialog.Backdrop className="backdrop" />
+              <AlertDialog.Viewport className="dialog-viewport">
+                <AlertDialog.Popup className="dialog sheet">
+                  <div className="receipt stack">
+                    <AlertDialog.Title render={<h2 />}>刪除「{habit.name}」？</AlertDialog.Title>
+                    <AlertDialog.Description className="meta">{habit.checkIns.length} 筆打卡紀錄會一起刪除，無法復原。</AlertDialog.Description>
+                    <div className="actions">
+                      <AlertDialog.Close className="btn ghost">保留</AlertDialog.Close>
+                      <button
+                        className="btn"
+                        onClick={async () => {
+                          await deleteHabit({ data: { id: habit.id } })
+                          navigate({ to: '/', search: { filter: 'all' } })
+                        }}
+                      >
+                        刪除
+                      </button>
+                    </div>
+                  </div>
+                </AlertDialog.Popup>
+              </AlertDialog.Viewport>
+            </AlertDialog.Portal>
+          </AlertDialog.Root>
+        </div>
       </section>
     </div>
+    {editing && (
+      <HabitForm
+        habit={{ ...habit, schedule: habit.schedules.at(-1)!, unit: unit[habit.progress.kind] }}
+        onSaved={async () => {
+          await router.invalidate()
+          setEditing(false)
+        }}
+      />
+    )}
+    </>
   )
 }

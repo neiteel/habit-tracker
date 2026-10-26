@@ -72,6 +72,25 @@ export const db = {
     else await orm.delete(checkIn).where(and(eq(checkIn.habitId, id), eq(checkIn.onDate, date)))
     return db.get(userId, id)
   },
+  /** Name and cue change in place; a new frequency becomes a schedule version from `today` (SPEC-habits §6). */
+  async update(userId: string, id: string, { name, stackCue, schedule }: HabitInput, today: string) {
+    const h = await db.get(userId, id)
+    if (!h) return undefined
+    const rule = (s: HabitInput['schedule']) => JSON.stringify([s.kind, 'weeklyTarget' in s ? s.weeklyTarget : null, 'intervalDays' in s ? s.intervalDays : null])
+    const rename = orm.update(habit).set({ name, stackCue: stackCue ?? null }).where(and(eq(habit.id, id), eq(habit.userId, userId)))
+    if (rule(h.schedules.at(-1)!) === rule(schedule)) await rename
+    else {
+      // Null the other kind's field so an upserted row never keeps a stale target.
+      const version = { weeklyTarget: null, intervalDays: null, ...schedule }
+      await orm.batch([
+        rename,
+        // Changing twice in one day keeps only the latest rule for that day.
+        orm.insert(habitSchedule).values({ habitId: id, effectiveFrom: today, ...version })
+          .onConflictDoUpdate({ target: [habitSchedule.habitId, habitSchedule.effectiveFrom], set: version }),
+      ])
+    }
+    return db.get(userId, id)
+  },
   async remove(userId: string, id: string) {
     if (!isId(id)) return false
     const gone = await orm.delete(habit).where(and(eq(habit.id, id), eq(habit.userId, userId))).returning({ id: habit.id })

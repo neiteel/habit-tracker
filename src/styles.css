@@ -255,3 +255,26 @@ button.day[aria-busy='true'] { opacity: 0.5; }
 .legend [data-status='missed'] { background: linear-gradient(to top right, #0000 calc(50% - 0.5px), var(--ink-3) 50%, #0000 calc(50% + 0.5px)); }
 .stack > .rule { margin: 0; }
 .stack > .cal-head + .cal { margin-top: -0.75rem; }
+
+/* ── Dialog: a small receipt over a dimmed table ──────── */
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.32);
+  transition: opacity 200ms var(--ease-out);
+}
+.dialog-viewport { position: fixed; inset: 0; display: grid; place-items: center; padding: 1rem; }
+.dialog {
+  width: min(22rem, 100%);
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+.dialog .receipt { padding: 1.75rem 1.5rem 2rem; }
+.backdrop[data-starting-style], .backdrop[data-ending-style] { opacity: 0; }
+.dialog[data-starting-style], .dialog[data-ending-style] { opacity: 0; transform: scale(0.96) translateY(6px); }
+.backdrop[data-ending-style], .dialog[data-ending-style] { transition-duration: 150ms; } /* leave faster than arrive */
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog[data-starting-style], .dialog[data-ending-style] { transform: none; }
+}
