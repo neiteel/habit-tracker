@@ -1,29 +1,69 @@
 import '@tanstack/react-start/server-only'
+import { and, asc, eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/neon-http'
+import { z } from 'zod'
+import type { Schedule } from '../streak.ts'
+import * as schema from './schema.ts'
 
-export type Habit = { id: string; name: string; createdAt: string; done: string[] }
+const { habit, habitSchedule, checkIn } = schema
 
-// shortcut: in-memory, per-process store — resets on restart and isn't shared across
-// serverless instances; swap for a real database before deploying beyond one Node process.
-const habits = new Map<string, Habit>()
+export const orm = drizzle(process.env.DATABASE_URL!, { schema })
 
-for (const name of ['Read 20 pages', 'Walk 8k steps', 'No phone after 10pm']) {
-  const id = crypto.randomUUID()
-  habits.set(id, { id, name, createdAt: new Date().toISOString(), done: [] })
+export type Habit = { id: string; name: string; stackCue: string | null; createdOn: string; schedules: Schedule[]; checkIns: string[] }
+
+type ScheduleRow = typeof habitSchedule.$inferSelect
+
+const toSchedule = ({ effectiveFrom, kind, weeklyTarget, intervalDays }: ScheduleRow): Schedule =>
+  kind === 'daily' ? { effectiveFrom, kind }
+  : kind === 'weekly' ? { effectiveFrom, kind, weeklyTarget: weeklyTarget! }
+  : { effectiveFrom, kind, intervalDays: intervalDays! }
+
+// A non-UUID would make Postgres throw (22P02); to callers it is simply a habit that doesn't exist.
+const isId = (id: string) => z.uuid().safeParse(id).success
+
+async function find(userId: string, id?: string): Promise<Habit[]> {
+  const rows = await orm.query.habit.findMany({
+    // Every query is scoped to the signed-in user, so one user's ids are useless to another.
+    where: id ? and(eq(habit.userId, userId), eq(habit.id, id)) : eq(habit.userId, userId),
+    with: { schedules: true, checkIns: { columns: { onDate: true }, orderBy: asc(checkIn.onDate) } },
+    orderBy: asc(habit.createdAt),
+  })
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    stackCue: r.stackCue,
+    createdOn: r.createdOn,
+    schedules: r.schedules.map(toSchedule),
+    checkIns: r.checkIns.map((c) => c.onDate),
+  }))
 }
 
 export const db = {
-  list: () => [...habits.values()],
-  get: (id: string) => habits.get(id),
-  create(name: string) {
-    const h: Habit = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString(), done: [] }
-    habits.set(h.id, h)
-    return h
+  list: (userId: string) => find(userId),
+  async get(userId: string, id: string) {
+    return isId(id) ? (await find(userId, id))[0] : undefined
   },
-  toggle(id: string, date: string) {
-    const h = habits.get(id)
+  async create(userId: string, { name, createdOn }: { name: string; createdOn: string }): Promise<Habit> {
+    const id = crypto.randomUUID()
+    await orm.batch([
+      orm.insert(habit).values({ id, userId, name, createdOn }),
+      orm.insert(habitSchedule).values({ habitId: id, effectiveFrom: createdOn, kind: 'daily' }),
+    ])
+    return { id, name, stackCue: null, createdOn, schedules: [{ effectiveFrom: createdOn, kind: 'daily' }], checkIns: [] }
+  },
+  async toggle(userId: string, id: string, date: string) {
+    const h = await db.get(userId, id)
     if (!h) return undefined
-    h.done = h.done.includes(date) ? h.done.filter((d) => d !== date) : [...h.done, date].sort()
-    return h
+    if (h.checkIns.includes(date)) {
+      await orm.delete(checkIn).where(and(eq(checkIn.habitId, id), eq(checkIn.onDate, date)))
+      return { ...h, checkIns: h.checkIns.filter((d) => d !== date) }
+    }
+    await orm.insert(checkIn).values({ habitId: id, onDate: date }).onConflictDoNothing()
+    return { ...h, checkIns: [...h.checkIns, date].sort() }
   },
-  remove: (id: string) => habits.delete(id),
+  async remove(userId: string, id: string) {
+    if (!isId(id)) return false
+    const gone = await orm.delete(habit).where(and(eq(habit.id, id), eq(habit.userId, userId))).returning({ id: habit.id })
+    return gone.length > 0
+  },
 }

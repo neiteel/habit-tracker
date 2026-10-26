@@ -56,7 +56,7 @@ function Today() {
             <Link to="/habits/$habitId" params={{ habitId: h.id }}>details</Link>
           </li>
         ))}
-        {habits.length === 0 && <li>Nothing here.</li>}
+        {habits.length === 0 && <li>{filter === 'all' ? '還沒有習慣，在下面新增第一個吧。' : '這裡沒有習慣。'}</li>}
       </ul>
 
       <form

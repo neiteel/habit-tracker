@@ -15,7 +15,7 @@ function HabitPage() {
   return (
     <>
       <h1>{habit.name}</h1>
-      <p>Current streak: {habit.streak} · Total days done: {habit.done.length}</p>
+      <p>Current streak: {habit.streak} · Total days done: {habit.checkIns.length}</p>
       <button
         onClick={async () => {
           await deleteHabit({ data: { id: habit.id } })

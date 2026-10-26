@@ -9,7 +9,7 @@
 - [x] T7 Drizzle + Neon 與 schema
 - [ ] T8 Google 登入與部署驗證 ⚠️（程式碼已完成，等 Google OAuth 金鑰和部署許可）
 - [ ] Checkpoint A：基礎（和你確認）
-- [ ] T9 新增習慣並保存到 Neon
+- [x] T9 新增習慣並保存到 Neon
 - [ ] T10 打卡並顯示連續紀錄
 - [ ] T11 三種頻率
 - [ ] Checkpoint B：核心流程（和你確認）

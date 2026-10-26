@@ -4,7 +4,7 @@ import { getRequestHeaders } from '@tanstack/react-start/server'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
-import { orm } from './orm.ts'
+import { orm } from './db.ts'
 import * as schema from './schema.ts'
 
 export const auth = betterAuth({

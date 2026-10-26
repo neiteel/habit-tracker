@@ -24,7 +24,7 @@ function Insights() {
           <h2>{h.name}</h2>
           <div className="grid" role="list" aria-label={`${h.name} history`}>
             {days.map((d) => {
-              const done = h.done.includes(d)
+              const done = h.checkIns.includes(d)
               const label = `${fmt.format(new Date(d + 'T00:00:00Z'))}: ${done ? 'done' : 'not done'}`
               return <div key={d} role="listitem" className="cell" data-done={done} title={label} aria-label={label} />
             })}
