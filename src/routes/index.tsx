@@ -5,17 +5,22 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { HabitForm } from '../habit-form'
 import { getStats, listHabits, setCheckIn } from '../habits'
+import { DEFAULT_TIME, localDay } from '../streak'
 
 const filters = ['all', 'todo', 'done'] as const
 const unit = { daily: '天', weekly: '週', interval: '次' } as const
 
 type Row = Awaited<ReturnType<typeof listHabits>>[number]
 
-function Progress({ p }: { p: Row['progress'] }) {
-  if (p.kind === 'weekly') return <span>本週 {p.done}/{p.target}</span>
-  if (p.kind === 'interval') return <span>{p.daysLeft === null ? '還沒開始' : p.daysLeft > 0 ? `剩 ${p.daysLeft} 天` : p.daysLeft === 0 ? '今天到期' : '已過期'}</span>
-  return null
+function progressText(p: Row['progress']) {
+  if (p.kind === 'weekly') return `本週 ${p.done}/${p.target}`
+  if (p.kind === 'interval') return p.daysLeft === null ? '尚未開始' : p.daysLeft > 0 ? `剩 ${p.daysLeft} 天` : p.daysLeft === 0 ? '今天到期' : '已逾期'
+  return '每天'
 }
+
+const filterLabel = { all: '全部', todo: '待完成', done: '已完成' } as const
+const weekday = new Intl.DateTimeFormat('zh-Hant', { weekday: 'short', timeZone: 'UTC' })
+const printDate = (iso: string) => `${iso.replaceAll('-', '.')} ${weekday.format(new Date(iso + 'T00:00:00Z'))}`
 
 export const Route = createFileRoute('/')({
   validateSearch: z.object({ filter: z.enum(filters).default('all').catch('all') }),
@@ -62,43 +67,73 @@ function Today() {
     }
   }
 
+  const today = habits[0]?.today ?? localDay(new Date(), DEFAULT_TIME)
+
   return (
     <>
-      <h1>Today</h1>
-      <Suspense fallback={<p aria-busy="true">Crunching stats…</p>}>
-        <Await promise={stats}>
-          {(s) => <p>{s.doneToday}/{s.total} done today · best streak {s.bestStreak}</p>}
-        </Await>
-      </Suspense>
+      <div className="sheet">
+        <section className="receipt" aria-labelledby="today-title">
+          <header className="masthead">
+            <span className="eyebrow">Daily Record</span>
+            <h1 id="today-title" className="brand">Habit Tracker</h1>
+            <span className="meta">{printDate(today)}</span>
+          </header>
 
-      <p>
-        {filters.map((f) => (
-          <Link key={f} to="/" search={{ filter: f }} style={{ marginRight: '.75rem' }}
-            activeProps={{ style: { fontWeight: 700, marginRight: '.75rem' } }}>
-            {f}
-          </Link>
-        ))}
-      </p>
+          <nav className="tabs" aria-label="篩選">
+            {filters.map((f) => (
+              <Link key={f} to="/" search={{ filter: f }} activeOptions={{ includeSearch: true }}>
+                {filterLabel[f]}
+              </Link>
+            ))}
+          </nav>
 
-      {error && <p role="alert">{error}</p>}
-      <ul>
-        {habits.map((h) => (
-          <li key={h.id}>
-            <input type="checkbox" id={h.id} checked={checked(h)} onChange={() => toggle(h)} />
-            <label htmlFor={h.id}>
-              {h.name}
-              {h.stackCue && <small className="cue">{h.stackCue}</small>}
-            </label>
-            <Progress p={h.progress} />
-            <span>🔥 {h.streak} {unit[h.progress.kind]}</span>
-            <span aria-label={`剩 ${h.freezesLeft} 張凍結卡`}>❄️×{h.freezesLeft}</span>
-            <Link to="/habits/$habitId" params={{ habitId: h.id }}>details</Link>
-          </li>
-        ))}
-        {habits.length === 0 && <li>{filter === 'all' ? '還沒有習慣，在下面新增第一個吧。' : '這裡沒有習慣。'}</li>}
-      </ul>
+          <hr className="rule" />
+
+          {error && <p className="alert" role="alert">{error}</p>}
+          <ul className="items">
+            {habits.map((h) => (
+              <li key={h.id} className="item">
+                <input type="checkbox" className="tick" id={h.id} checked={checked(h)} onChange={() => toggle(h)} />
+                <label htmlFor={h.id} className="line">
+                  <span className="name">{h.name}</span>
+                  <span className="leader" aria-hidden="true" />
+                  <span className="value">{h.streak} {unit[h.progress.kind]}</span>
+                </label>
+                <div className="sub label">
+                  <span>{progressText(h.progress)}</span>
+                  {h.stackCue && <span>· {h.stackCue}</span>}
+                  <span aria-label={`剩 ${h.freezesLeft} 張凍結卡`}>凍結 ×{h.freezesLeft}</span>
+                  <Link to="/habits/$habitId" params={{ habitId: h.id }} aria-label={`${h.name} 明細`}>明細 →</Link>
+                </div>
+              </li>
+            ))}
+            {habits.length === 0 && <li className="empty">{filter === 'all' ? '還沒有習慣。從下面新增第一個吧。' : '這裡沒有習慣。'}</li>}
+          </ul>
+
+          <hr className="rule" />
+
+          <Suspense fallback={<Totals />}>
+            <Await promise={stats}>{(s) => <Totals s={s} />}</Await>
+          </Suspense>
+
+          <div className="barcode" aria-hidden="true" />
+          <p className="footnote meta">每一個勾，都是給明天的自己</p>
+        </section>
+      </div>
 
       <HabitForm onSaved={() => router.invalidate()} />
     </>
+  )
+}
+
+function Totals({ s }: { s?: { total: number; doneToday: number; bestStreak: number } }) {
+  const v = (n?: number) => (n === undefined ? '—' : n)
+  return (
+    <div className="totals" aria-busy={!s}>
+      <div className="line"><span>習慣</span><span className="leader" /><span className="value">{v(s?.total)}</span></div>
+      <div className="line"><span>最長連續</span><span className="leader" /><span className="value">{v(s?.bestStreak)}</span></div>
+      <hr className="rule double" />
+      <div className="line grand"><span>今日完成</span><span className="leader" /><span className="value">{s ? `${s.doneToday} / ${s.total}` : '—'}</span></div>
+    </div>
   )
 }

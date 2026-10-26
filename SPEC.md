@@ -86,7 +86,9 @@ public/                        → manifest.webmanifest、sw.js、icons
 | 深色模式 | **不做**。`color-scheme: light`，不寫 `prefers-color-scheme` |
 | 字體 | 英文和數字用 **Geist Mono**，中文用 **Noto Sans TC**。字體堆疊：`'Geist Mono Variable', 'Noto Sans TC Variable', monospace`。載入方式見下方 |
 | 印章 | 純黑，略微歪斜 |
-| 卡片 | 上下緣是鋸齒狀的撕紙邊（CSS `mask`），不用陰影 |
+| 卡片（D14） | 「高級收據」：介於扁平和擬物之間。**擬物的是紙**：上下緣用 CSS `mask` 剪成鋸齒，外層用 `drop-shadow` 讓陰影順著鋸齒走，紙張浮在白底上。**扁平的是印刷**：黑字、虛線分隔、點線連接品項、等寬數字、小計和總計、條碼。紙張本身是純白，不加紙紋，因為紙紋會讓紙看起來偏灰 |
+| 灰階 | 陰影和次要文字用**半透明的純黑**（例如 `rgb(0 0 0 / 0.62)`），不用帶色調的灰 |
+| 圖示 | 不用彩色 emoji（🔥、❄️），一律用文字 |
 | 分隔線 | 虛線（`- - - -`），不用實線 |
 | 品項列 | 名稱和連續數之間用點線連接：`閱讀 20 頁 ········ 🔥 12 天` |
 | 打卡動畫 | 該行像「印出來」一樣由上往下浮現，加上蓋章；里程碑時整張收據往下吐出一截 |
@@ -167,6 +169,7 @@ export const toggleCheckIn = createServerFn({ method: 'POST' })
 | D8 | 一週從週一開始（ISO 週） | 2026-10-26 |
 | D9 | 拆成四個模組規格 | 2026-10-26 |
 | D11 | 視覺風格：純白、純黑、撕紙鋸齒、Geist Mono 加 Noto Sans TC，不做深色模式 | 2026-10-26 |
+| D14 | 視覺改為「高級收據」：紙張有陰影、文字是扁平的印刷；樣式移到 `src/styles.css`，用 `?url` 載入 | 2026-10-26 |
 | D12 | UI 元件用 `@base-ui/react` 加純 CSS，不加 Tailwind | 2026-10-26 |
 | D13 | 字體用 Fontsource 自行託管，`?url` 放進 root 的 head links；印章用純黑 | 2026-10-26 |
 | D10 | 延後 magic link 和 `reminders`：這是測試工作流程用的專案，不為排程付 Vercel Pro，也不設定寄件網域。D3 和 D7 的排程部分暫停 | 2026-10-26 |

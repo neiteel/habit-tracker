@@ -1,35 +1,25 @@
-// SSR mode: false. Preferences live in the browser's localStorage, so both the loader and
-// the component must run on the client; the server only sends the document shell.
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 
-const KEY = 'habit-tracker:reminder'
-
+// Time zone and day-start settings arrive in T15 (SPEC-habits §3).
 export const Route = createFileRoute('/settings')({
-  ssr: false,
-  loader: () => ({ reminder: localStorage.getItem(KEY) ?? '' }),
-  pendingComponent: () => <p aria-busy="true">Loading settings…</p>,
   component: Settings,
 })
 
 function Settings() {
-  const { reminder } = Route.useLoaderData()
-  const router = useRouter()
+  const { user } = Route.useRouteContext()
   return (
-    <>
-      <h1>Settings</h1>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          localStorage.setItem(KEY, String(new FormData(e.currentTarget).get('reminder') ?? ''))
-          router.invalidate()
-        }}
-      >
-        <label>
-          Daily reminder note (stored on this device) <input name="reminder" defaultValue={reminder} />
-        </label>{' '}
-        <button>Save</button>
-      </form>
-      {reminder && <p>Current: “{reminder}”</p>}
-    </>
+    <div className="sheet">
+      <section className="receipt" aria-labelledby="settings-title">
+        <header className="masthead">
+          <span className="eyebrow">Account</span>
+          <h1 id="settings-title">設定</h1>
+        </header>
+        <hr className="rule" />
+        <div className="totals">
+          <div className="line"><span>名稱</span><span className="leader" /><span className="value">{user?.name}</span></div>
+          <div className="line"><span>帳號</span><span className="leader" /><span className="value">{user?.email}</span></div>
+        </div>
+      </section>
+    </div>
   )
 }

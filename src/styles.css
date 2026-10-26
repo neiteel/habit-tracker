@@ -1,0 +1,220 @@
+/* Premium thermal receipt (SPEC.md D11): a real sheet of paper (torn edges, soft shadow, faint
+   grain) carrying flat, precise print. Only #000 and #fff; greys are black ink at lower density. */
+
+:root {
+  --paper: #fff;
+  --ink: #000;
+  --ink-2: rgb(0 0 0 / 0.62); /* secondary text */
+  --ink-3: rgb(0 0 0 / 0.38); /* hints, leaders */
+  --ink-4: rgb(0 0 0 / 0.1); /* hairlines */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --mono: 'Geist Mono Variable', 'Noto Sans TC Variable', ui-monospace, monospace;
+  --text: 'Noto Sans TC Variable', 'Geist Mono Variable', system-ui, sans-serif;
+  color-scheme: light;
+  font: 15px/1.6 var(--text);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--paper);
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(2.5rem, env(safe-area-inset-bottom));
+}
+
+main { max-width: 24rem; margin: 0 auto; display: grid; gap: 2rem; }
+
+:focus-visible { outline: 1.5px solid var(--ink); outline-offset: 3px; }
+
+/* ── Paper ─────────────────────────────────────────────── */
+
+/* The shadow lives on a wrapper because drop-shadow follows the masked (torn) outline. */
+/* The 0-offset layer outlines both torn edges; the offset layers lift the sheet off the table. */
+.sheet {
+  filter:
+    drop-shadow(0 0 0.5px rgb(0 0 0 / 0.22))
+    drop-shadow(0 2px 2px rgb(0 0 0 / 0.05))
+    drop-shadow(0 12px 20px rgb(0 0 0 / 0.07));
+}
+
+.receipt {
+  --tooth: 10px;
+  position: relative;
+  background: var(--paper); /* pure white: depth comes from the tear and the shadow, not a tint */
+  padding: 2rem 1.5rem 2.25rem;
+  /* Zig-zag tear along the top and bottom edges. */
+  mask:
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--tooth) 51% repeat-x,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--tooth) 51% repeat-x;
+}
+
+/* ── Print ─────────────────────────────────────────────── */
+
+.eyebrow, .label, .meta {
+  font: 500 0.6875rem/1.4 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.masthead { text-align: center; display: grid; gap: 0.25rem; }
+.masthead h1 {
+  margin: 0;
+  font: 600 1.375rem/1.2 var(--mono);
+  letter-spacing: 0.04em; /* CJK titles read as words, not spaced-out caps */
+}
+.masthead h1:not(.brand) { font-family: var(--text); font-size: 1.5rem; }
+.masthead h1.brand { letter-spacing: 0.18em; text-transform: uppercase; }
+.masthead .meta { font-variant-numeric: tabular-nums; }
+
+h2 { margin: 0; font: 600 0.9375rem/1.4 var(--text); }
+.masthead h2 { font-size: 1.0625rem; }
+
+.rule { border: 0; border-top: 1px dashed var(--ink-3); margin: 1.25rem 0; }
+.rule.double { border-top: 3px double var(--ink); }
+
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Item line: name ········ value */
+.line { display: flex; align-items: baseline; gap: 0.5rem; }
+.line .leader { flex: 1; min-width: 1rem; border-bottom: 1px dotted var(--ink-3); translate: 0 -0.3em; }
+.line .value { font: 500 0.875rem/1.4 var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.totals { display: grid; gap: 0.35rem; }
+.totals .line { font: 0.8125rem/1.5 var(--mono); }
+.totals .grand { font-weight: 700; font-size: 0.9375rem; letter-spacing: 0.04em; }
+
+.barcode {
+  height: 2.75rem;
+  margin: 1.5rem auto 0.5rem;
+  width: 75%;
+  background: repeating-linear-gradient(90deg,
+    var(--ink) 0 2px, #0000 2px 4px, var(--ink) 4px 5px, #0000 5px 8px, var(--ink) 8px 11px, #0000 11px 12px,
+    var(--ink) 12px 13px, #0000 13px 16px, var(--ink) 16px 18px, #0000 18px 19px, var(--ink) 19px 20px, #0000 20px 23px);
+}
+.footnote { text-align: center; }
+
+/* ── Habit items ──────────────────────────────────────── */
+
+.items { list-style: none; margin: 0; padding: 0; display: grid; }
+.item { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.875rem; padding: 0.875rem 0; border-bottom: 1px dashed var(--ink-4); }
+.item:last-child { border-bottom: 0; }
+.item .name { font-size: 1rem; font-weight: 500; }
+.item .sub { grid-column: 2; display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; }
+.item .sub a { color: inherit; text-decoration: none; margin-left: auto; }
+.empty { padding: 1.5rem 0; text-align: center; color: var(--ink-2); }
+
+/* A printed tick box that fills with ink. */
+.tick {
+  appearance: none;
+  margin: 0.2rem 0 0;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  background: var(--paper) center / 70% no-repeat;
+  cursor: pointer;
+  transition: background-color 140ms var(--ease-out), transform 140ms var(--ease-out);
+}
+.tick:checked {
+  background-color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5 6.5 12 13 4.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='square'/%3E%3C/svg%3E");
+}
+.tick:active { transform: scale(0.9); }
+
+/* ── Chrome ───────────────────────────────────────────── */
+
+nav { display: flex; align-items: center; gap: 1.25rem; padding: 0.25rem 0.25rem 0; }
+nav a, nav button {
+  font: 500 0.6875rem/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+nav a.active { color: var(--ink); }
+nav button { margin-left: auto; }
+
+.tabs { display: flex; gap: 0.25rem; justify-content: center; margin-top: 1rem; }
+.tabs a {
+  font: 500 0.6875rem/1 var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+}
+.tabs a.active { background: var(--ink); color: var(--paper); }
+
+/* ── Controls ─────────────────────────────────────────── */
+
+.btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  width: 100%;
+  font: 600 0.8125rem/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--ink);
+  border: 0;
+  border-radius: 4px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out), opacity 140ms ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: progress; }
+
+.field { display: grid; gap: 0.35rem; }
+.field input, .field select {
+  font: 1rem/1.4 var(--text); /* 16px keeps iOS from zooming on focus */
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--ink-3);
+  border-radius: 0;
+  padding: 0.35rem 0;
+  transition: border-color 140ms ease;
+}
+.field input:focus, .field select:focus { outline: none; border-bottom-color: var(--ink); }
+.field input::placeholder { color: var(--ink-3); }
+.field select { appearance: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E") right center / 0.7rem no-repeat; }
+.field .inline { display: flex; align-items: baseline; gap: 0.5rem; }
+.field .inline input { width: 4rem; text-align: center; font-family: var(--mono); }
+.form { display: grid; gap: 1.25rem; }
+
+.alert { margin: 0; font-size: 0.8125rem; border-left: 2px solid var(--ink); padding-left: 0.75rem; }
+
+/* ── History grid (insights) ──────────────────────────── */
+
+.grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 0.75rem; }
+.cell { aspect-ratio: 1; border: 1px solid var(--ink-3); border-radius: 2px; }
+.cell[data-done='true'] { background: var(--ink); border-color: var(--ink); }
+
+@media (hover: hover) and (pointer: fine) {
+  nav a:hover, .item .sub a:hover { color: var(--ink); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tick, .btn { transition: background-color 140ms ease, opacity 140ms ease; }
+  .tick:active, .btn:active { transform: none; }
+}
+.tagline { margin: 0; text-align: center; font-size: 1.0625rem; line-height: 1.8; }
+section.receipt > .btn + .alert { margin-top: 1rem; }
+.sheet.hero { margin-top: max(2rem, 14dvh); }
+.stack { display: grid; gap: 1.5rem; }
+.history + .history { margin-top: 1.5rem; }
+.legend { display: flex; gap: 1rem; justify-content: center; margin-top: 1.25rem; }
+.legend i { display: inline-block; width: 0.625rem; height: 0.625rem; border: 1px solid var(--ink-3); border-radius: 2px; vertical-align: -0.05em; margin-right: 0.35rem; }
+.legend i.on { background: var(--ink); border-color: var(--ink); }
+.btn.ghost { color: var(--ink); background: none; box-shadow: inset 0 0 0 1px var(--ink); }
