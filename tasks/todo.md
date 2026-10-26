@@ -6,7 +6,7 @@
 - [x] T4 weekly 規則
 - [x] T5 interval 規則
 - [x] T6 凍結卡與頻率版本
-- [ ] T7 Drizzle + Neon 與 schema
+- [ ] T7 Drizzle + Neon 與 schema（離線部分已完成，等 DB 網址跑 migrate 和 test:db）
 - [ ] T8 Google 登入與部署驗證 ⚠️
 - [ ] Checkpoint A：基礎（和你確認）
 - [ ] T9 新增習慣並保存到 Neon
