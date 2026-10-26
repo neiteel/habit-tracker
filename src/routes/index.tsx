@@ -1,5 +1,5 @@
 // SSR mode: full (default). The habit list is the page's main content, so it is
-// server-rendered for first paint; slow stats are streamed in after the shell.
+// server-rendered for first paint; the totals are streamed in after the shell.
 import { Await, Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
@@ -126,12 +126,13 @@ function Today() {
   )
 }
 
-function Totals({ s }: { s?: { total: number; doneToday: number; bestStreak: number } }) {
+function Totals({ s }: { s?: Awaited<ReturnType<typeof getStats>> }) {
   const v = (n?: number) => (n === undefined ? '—' : n)
   return (
     <div className="totals" aria-busy={!s}>
       <div className="line"><span>習慣</span><span className="leader" /><span className="value">{v(s?.total)}</span></div>
       <div className="line"><span>最長連續</span><span className="leader" /><span className="value">{v(s?.bestStreak)}</span></div>
+      <div className="line"><span>本月凍結卡剩餘</span><span className="leader" /><span className="value">{v(s?.freezesLeft)}</span></div>
       <hr className="rule double" />
       <div className="line grand"><span>今日完成</span><span className="leader" /><span className="value">{s ? `${s.doneToday} / ${s.total}` : '—'}</span></div>
     </div>

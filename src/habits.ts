@@ -47,13 +47,12 @@ export const getHabit = createServerFn({ method: 'GET' })
 
 export const getStats = createServerFn({ method: 'GET' }).handler(async () => {
   const user = await requireUser()
-  // Stand-in for a slow aggregate query, so the streamed section is visibly deferred.
-  await new Promise((r) => setTimeout(r, 800))
   const all = (await db.list(user.id)).map(view)
   return {
     total: all.length,
     doneToday: all.filter((h) => h.doneToday).length,
     bestStreak: Math.max(0, ...all.map((h) => h.streak)),
+    freezesLeft: all.reduce((n, h) => n + h.freezesLeft, 0),
   }
 })
 

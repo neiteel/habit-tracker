@@ -3,7 +3,7 @@
 // server can't know — rendering it there would cause hydration mismatches.
 import { createFileRoute } from '@tanstack/react-router'
 import { listHabits } from '../habits'
-import { DEFAULT_TIME, lastNDays, localDay } from '../streak'
+import { DEFAULT_TIME, frozenDates, lastNDays, localDay } from '../streak'
 
 export const Route = createFileRoute('/insights')({
   ssr: 'data-only',
@@ -26,7 +26,9 @@ function Insights() {
         </header>
         <hr className="rule" />
         {habits.length === 0 && <p className="empty">還沒有習慣。</p>}
-        {habits.map((h) => (
+        {habits.map((h) => {
+          const frozen = frozenDates(h.frozen)
+          return (
           <section key={h.id} className="history">
             <div className="line">
               <h2>{h.name}</h2>
@@ -35,15 +37,17 @@ function Insights() {
             </div>
             <div className="grid" role="list" aria-label={`${h.name} 的紀錄`}>
               {days.map((d) => {
-                const done = h.checkIns.includes(d)
-                const label = `${fmt.format(new Date(d + 'T00:00:00Z'))}：${done ? '已完成' : '未完成'}`
-                return <div key={d} role="listitem" className="cell" data-done={done} title={label} aria-label={label} />
+                const status = h.checkIns.includes(d) ? 'done' : frozen.has(d) ? 'frozen' : undefined
+                const label = `${fmt.format(new Date(d + 'T00:00:00Z'))}：${status === 'done' ? '已完成' : status === 'frozen' ? '凍結保住' : '未完成'}`
+                return <div key={d} role="listitem" className="cell" data-status={status} title={label} aria-label={label} />
               })}
             </div>
           </section>
-        ))}
+          )
+        })}
         <p className="legend meta" aria-hidden="true">
-          <span><i className="on" />完成</span>
+          <span><i data-status="done" />完成</span>
+          <span><i data-status="frozen" />凍結</span>
           <span><i />未完成</span>
         </p>
       </section>

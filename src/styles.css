@@ -199,7 +199,8 @@ nav button { margin-left: auto; }
 
 .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 0.75rem; }
 .cell { aspect-ratio: 1; border: 1px solid var(--ink-3); border-radius: 2px; }
-.cell[data-done='true'] { background: var(--ink); border-color: var(--ink); }
+.cell[data-status='done'] { background: var(--ink); border-color: var(--ink); }
+.cell[data-status='frozen'] { background: repeating-linear-gradient(-45deg, var(--ink-4) 0 2px, var(--paper) 2px 5px); }
 
 @media (hover: hover) and (pointer: fine) {
   nav a:hover, .item .sub a:hover { color: var(--ink); }
@@ -215,8 +216,7 @@ section.receipt > .btn + .alert { margin-top: 1rem; }
 .stack { display: grid; gap: 1.5rem; }
 .history + .history { margin-top: 1.5rem; }
 .legend { display: flex; gap: 1rem; justify-content: center; margin-top: 1.25rem; }
-.legend i { display: inline-block; width: 0.625rem; height: 0.625rem; border: 1px solid var(--ink-3); border-radius: 2px; vertical-align: -0.05em; margin-right: 0.35rem; }
-.legend i.on { background: var(--ink); border-color: var(--ink); }
+.legend i:not([data-status]) { display: inline-block; width: 0.625rem; height: 0.625rem; border: 1px solid var(--ink-3); border-radius: 2px; vertical-align: -0.05em; margin-right: 0.35rem; }
 .btn.ghost { color: var(--ink); background: none; box-shadow: inset 0 0 0 1px var(--ink); }
 
 /* ── Calendar (habit detail) ──────────────────────────── */
