@@ -1,10 +1,12 @@
 // SSR mode: full (default). The habit list is the page's main content, so it is
 // server-rendered for first paint; the totals are streamed in after the shell.
 import { Await, Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { Drawer } from '@base-ui/react/drawer'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { HabitForm } from '../habit-form'
 import { getStats, getTime, listHabits, setCheckIn } from '../habits'
+import { MILESTONES } from '../streak'
 
 const filters = ['all', 'todo', 'done'] as const
 const unit = { daily: '天', weekly: '週', interval: '次' } as const
@@ -18,6 +20,7 @@ function progressText(p: Row['progress']) {
 }
 
 const filterLabel = { all: '全部', todo: '待完成', done: '已完成' } as const
+const frozenNote = { daily: '昨天由凍結卡保住', weekly: '上週由凍結卡保住', interval: '上一段由凍結卡保住' } as const
 const weekday = new Intl.DateTimeFormat('zh-Hant', { weekday: 'short', timeZone: 'UTC' })
 const printDate = (iso: string) => `${iso.replaceAll('-', '.')} ${weekday.format(new Date(iso + 'T00:00:00Z'))}`
 
@@ -41,11 +44,26 @@ function Today() {
   const [error, setError] = useState('')
   const checked = (h: Row) => optimistic[h.id] ?? h.checkedInToday
 
+  // Streaks as last committed to screen. A change rolls the number in, and crossing a milestone in
+  // this session prints a stub; nothing animates on a plain page load. `rolled` keeps the class on
+  // through the re-renders that follow, or the transition would be cut off mid-flight.
+  const shown = useRef<Record<string, number>>({})
+  const [rolled, setRolled] = useState<Record<string, number>>({})
+  const [milestone, setMilestone] = useState<Record<string, number>>({})
+  const rolls = (h: Row) => rolled[h.id] === h.streak || (shown.current[h.id] !== undefined && shown.current[h.id] !== h.streak)
+  const [adding, setAdding] = useState(false)
+
   useEffect(() => {
     setOptimistic((o) => {
       const pending = Object.entries(o).filter(([id, v]) => habits.find((h) => h.id === id)?.checkedInToday !== v)
       return pending.length === Object.keys(o).length ? o : Object.fromEntries(pending)
     })
+    const prev = shown.current
+    const changed = habits.filter((h) => prev[h.id] !== undefined && prev[h.id] !== h.streak)
+    if (changed.length) setRolled((r) => ({ ...r, ...Object.fromEntries(changed.map((h) => [h.id, h.streak])) }))
+    const reached = changed.filter((h) => h.streak > prev[h.id]! && MILESTONES.includes(h.streak))
+    if (reached.length) setMilestone((m) => ({ ...m, ...Object.fromEntries(reached.map((h) => [h.id, h.streak])) }))
+    shown.current = Object.fromEntries(habits.map((h) => [h.id, h.streak]))
   }, [habits])
 
   // One request at a time per habit, so the server ends on the user's last tap.
@@ -53,6 +71,7 @@ function Today() {
 
   const toggle = async (h: Row) => {
     setError('')
+    navigator.vibrate?.(10) // Android only; same frame as the tick (iOS has no Vibration API)
     const done = !checked(h)
     setOptimistic((o) => ({ ...o, [h.id]: done }))
     const send = (queue.current.get(h.id) ?? Promise.resolve()).catch(() => {}).then(() => setCheckIn({ data: { id: h.id, date: h.today, done } }))
@@ -94,7 +113,10 @@ function Today() {
                 <label htmlFor={h.id} className="line">
                   <span className="name">{h.name}</span>
                   <span className="leader" aria-hidden="true" />
-                  <span className="value">{h.streak} {unit[h.progress.kind]}</span>
+                  <span className="value">
+                    <span key={h.streak} className={rolls(h) ? 'roll' : undefined}>{h.streak}</span>{' '}
+                    {unit[h.progress.kind]}
+                  </span>
                 </label>
                 <div className="sub label">
                   <span>{progressText(h.progress)}</span>
@@ -102,9 +124,13 @@ function Today() {
                   <span aria-label={`剩 ${h.freezesLeft} 張凍結卡`}>凍結 ×{h.freezesLeft}</span>
                   <Link to="/habits/$habitId" params={{ habitId: h.id }} aria-label={`${h.name} 明細`}>明細 →</Link>
                 </div>
+                {h.justFrozen && <p className="note print label">{frozenNote[h.progress.kind]}</p>}
+                {milestone[h.id] && (
+                  <p className="milestone print" role="status">★ 連續 {milestone[h.id]} {unit[h.progress.kind]} 達成</p>
+                )}
               </li>
             ))}
-            {habits.length === 0 && <li className="empty">{filter === 'all' ? '還沒有習慣。從下面新增第一個吧。' : '這裡沒有習慣。'}</li>}
+            {habits.length === 0 && <li className="empty">{filter === 'all' ? '還沒有習慣。按下方「新增習慣」開始。' : '這裡沒有習慣。'}</li>}
           </ul>
 
           <hr className="rule" />
@@ -118,7 +144,26 @@ function Today() {
         </section>
       </div>
 
-      <HabitForm onSaved={() => router.invalidate()} />
+      <Drawer.Root open={adding} onOpenChange={setAdding}>
+        <Drawer.Trigger className="btn ghost">＋ 新增習慣</Drawer.Trigger>
+        <Drawer.Portal>
+          <Drawer.Backdrop className="drawer-backdrop" />
+          <Drawer.Viewport className="drawer-viewport">
+            <Drawer.Popup className="drawer">
+              <Drawer.Content>
+                <Drawer.Title className="sr-only">新增習慣</Drawer.Title>
+                <span className="grabber" aria-hidden="true" />
+                <HabitForm
+                  onSaved={async () => {
+                    await router.invalidate()
+                    setAdding(false)
+                  }}
+                />
+              </Drawer.Content>
+            </Drawer.Popup>
+          </Drawer.Viewport>
+        </Drawer.Portal>
+      </Drawer.Root>
     </>
   )
 }

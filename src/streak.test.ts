@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { backfilledDays, canCheckIn, computeStreak, dayStatus, frozenDates, lastNDays, localDay, monthGrid, progress } from './streak.ts'
+import { backfilledDays, canCheckIn, justFrozen, computeStreak, dayStatus, frozenDates, lastNDays, localDay, monthGrid, progress } from './streak.ts'
 
 const taipei = (dayStartMinutes = 0) => ({ timeZone: 'Asia/Taipei', dayStartMinutes })
 const la = (dayStartMinutes = 0) => ({ timeZone: 'America/Los_Angeles', dayStartMinutes })
@@ -282,4 +282,22 @@ test('backfilledDays: a check-in recorded on a later local day is a backfill', (
 test('backfilledDays: respects the day start', () => {
   // Taipei 10-26 01:00 with a 04:00 day start is still the 10-25 habit day: on time, not a backfill.
   assert.deepEqual(backfilledDays({ '2026-10-25': new Date('2026-10-25T17:00:00Z') }, taipei(240)), [])
+})
+
+// --- "a freeze just saved you" note on Today: shown while the latest closed period was frozen ---
+test('justFrozen: daily means yesterday was frozen', () => {
+  const s = { effectiveFrom: '2026-10-01', kind: 'daily' } as const
+  assert.equal(justFrozen(s, ['2026-10-25'], [], '2026-10-26'), true)
+  assert.equal(justFrozen(s, ['2026-10-24'], [], '2026-10-26'), false) // older news
+})
+test('justFrozen: weekly means last ISO week was frozen', () => {
+  const s = { effectiveFrom: '2026-10-01', kind: 'weekly', weeklyTarget: 3 } as const
+  assert.equal(justFrozen(s, ['2026-W43'], [], '2026-10-28'), true) // this week is W44
+  assert.equal(justFrozen(s, ['2026-W42'], [], '2026-10-28'), false)
+})
+test('justFrozen: interval means a freeze covered a window since the last check-in', () => {
+  const s = { effectiveFrom: '2026-10-01', kind: 'interval', intervalDays: 3 } as const
+  assert.equal(justFrozen(s, ['2026-10-04'], ['2026-10-01'], '2026-10-06'), true)
+  assert.equal(justFrozen(s, ['2026-10-04'], ['2026-10-01', '2026-10-06'], '2026-10-06'), false) // checked in since
+  assert.equal(justFrozen(s, [], [], '2026-10-06'), false) // never started: nothing to save
 })

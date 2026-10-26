@@ -209,6 +209,16 @@ export function dayStatus(
 export const backfilledDays = (recordedAt: Record<string, Date>, time: TimeSettings) =>
   Object.entries(recordedAt).filter(([day, at]) => localDay(at, time) > day).map(([day]) => day).sort()
 
+/** Whether the most recently closed period was saved by a freeze, so Today can say so without storing "seen" state. */
+export function justFrozen(s: Schedule, frozen: string[], checkIns: string[], today: string) {
+  if (s.kind === 'daily') return frozen.includes(addDays(today, -1))
+  if (s.kind === 'weekly') return frozen.includes(isoWeek(addDays(mondayOf(today), -7)))
+  const last = checkIns.filter((d) => d <= today).sort().at(-1) ?? ''
+  return frozen.some((deadline) => deadline > last)
+}
+
+export const MILESTONES = [7, 30, 100]
+
 export const BACKFILL_DAYS = 2
 
 /** D4: a check-in may land on today or be backfilled up to two days, never before the habit existed. */

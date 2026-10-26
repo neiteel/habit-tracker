@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { requireUser } from './server/auth'
 import { type Habit, db } from './server/db'
 import { dayStartInput, habitInput, timeZoneInput } from './habit-input'
-import { FALLBACK_TIME, type TimeSettings, backfilledDays, canCheckIn, computeStreak, localDay, progress } from './streak'
+import { FALLBACK_TIME, type TimeSettings, backfilledDays, canCheckIn, computeStreak, justFrozen, localDay, progress } from './streak'
 
 const isoDay = z.iso.date()
 // Any string from the client: a malformed id is just a missing habit (404), not a 500.
@@ -33,6 +33,7 @@ const view = (h: Habit, time: TimeSettings) => {
     frozen: s.frozen,
     backfilled: backfilledDays(h.recordedAt, time),
     progress: progress(h.schedules.at(-1)!, h.checkIns, today),
+    justFrozen: justFrozen(h.schedules.at(-1)!, s.frozen, h.checkIns, today),
   }
 }
 

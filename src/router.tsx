@@ -6,6 +6,7 @@ export function getRouter() {
     routeTree,
     scrollRestoration: true,
     defaultPreload: 'intent',
+    defaultViewTransition: true, // a 160ms crossfade between pages (styles.css)
     defaultNotFoundComponent: () => <p>Not found.</p>,
     defaultErrorComponent: ({ error }) => <p role="alert">Something went wrong: {error instanceof Error ? error.message : String(error)}</p>,
   })
