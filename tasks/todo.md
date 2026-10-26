@@ -7,7 +7,7 @@
 - [x] T5 interval 規則
 - [x] T6 凍結卡與頻率版本
 - [x] T7 Drizzle + Neon 與 schema
-- [ ] T8 Google 登入與部署驗證 ⚠️
+- [ ] T8 Google 登入與部署驗證 ⚠️（程式碼已完成，等 Google OAuth 金鑰和部署許可）
 - [ ] Checkpoint A：基礎（和你確認）
 - [ ] T9 新增習慣並保存到 Neon
 - [ ] T10 打卡並顯示連續紀錄
