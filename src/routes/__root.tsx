@@ -85,6 +85,8 @@ button.link { border: 0; padding: 0; text-decoration: underline; }
 .receipt::before, .receipt::after { content: ''; position: absolute; inset-inline: -1px; height: 6px; background: ${zigzag} repeat-x; }
 .receipt::before { top: -6px; }
 .receipt::after { bottom: -6px; transform: scaleY(-1); }
+.cue { display: block; font-size: .8em; }
+form.receipt { display: grid; gap: .75rem; }
 .rule { border-top: 1px dashed var(--ink); margin: 1rem 0; }
 ul { list-style: none; padding: 0; }
 li { display: flex; align-items: center; gap: .5rem; padding: .4rem 0; }

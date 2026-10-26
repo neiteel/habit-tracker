@@ -65,15 +65,22 @@ async function newUser(id: string) {
 
 test('store: a created habit persists as daily with its local creation date', async () => {
   await newUser('u-store')
-  const created = await store.create('u-store', { name: 'Walk 8k steps', createdOn: '2026-10-26' })
+  const created = await store.create('u-store', { name: 'Walk 8k steps', createdOn: '2026-10-26', schedule: { kind: 'daily' } })
   const [h] = await store.list('u-store')
   assert.equal(h!.id, created.id)
   assert.deepEqual([h!.name, h!.createdOn, h!.schedules, h!.checkIns], ['Walk 8k steps', '2026-10-26', [{ effectiveFrom: '2026-10-26', kind: 'daily' }], []])
 })
 
+test('store: a weekly habit keeps its target and stacking cue', async () => {
+  await newUser('u-weekly')
+  await store.create('u-weekly', { name: 'Gym', stackCue: 'after work', createdOn: '2026-10-26', schedule: { kind: 'weekly', weeklyTarget: 3 } })
+  const [h] = await store.list('u-weekly')
+  assert.deepEqual([h!.stackCue, h!.schedules], ['after work', [{ effectiveFrom: '2026-10-26', kind: 'weekly', weeklyTarget: 3 }]])
+})
+
 test('store: toggling a day adds then removes the check-in', async () => {
   await newUser('u-toggle')
-  const h = await store.create('u-toggle', { name: 'Read', createdOn: '2026-10-26' })
+  const h = await store.create('u-toggle', { name: 'Read', createdOn: '2026-10-26', schedule: { kind: 'daily' } })
   assert.deepEqual((await store.toggle('u-toggle', h.id, '2026-10-26'))!.checkIns, ['2026-10-26'])
   assert.deepEqual((await store.toggle('u-toggle', h.id, '2026-10-26'))!.checkIns, [])
 })
@@ -81,7 +88,7 @@ test('store: toggling a day adds then removes the check-in', async () => {
 test('store: one user cannot see, check in or delete another user\'s habit', async () => {
   await newUser('u-alice')
   await newUser('u-bob')
-  const h = await store.create('u-alice', { name: 'Alice only', createdOn: '2026-10-26' })
+  const h = await store.create('u-alice', { name: 'Alice only', createdOn: '2026-10-26', schedule: { kind: 'daily' } })
   assert.deepEqual(await store.list('u-bob'), [])
   assert.equal(await store.get('u-bob', h.id), undefined)
   assert.equal(await store.toggle('u-bob', h.id, '2026-10-26'), undefined)

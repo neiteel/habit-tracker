@@ -155,6 +155,19 @@ export function computeStreak({ createdOn, schedules, checkIns, today }: StreakI
   }
 }
 
+/** The period in progress, for the Today row: this week's count, or days left in the interval window. */
+export function progress(s: Schedule, checkIns: string[], today: string) {
+  if (s.kind === 'weekly') {
+    const mon = mondayOf(today)
+    return { kind: s.kind, done: checkIns.filter((d) => d >= mon && d <= today).length, target: s.weeklyTarget }
+  }
+  if (s.kind === 'interval') {
+    const last = checkIns.filter((d) => d <= today).sort().at(-1)
+    return { kind: s.kind, daysLeft: last ? daysBetween(today, addDays(last, s.intervalDays)) : null }
+  }
+  return { kind: s.kind }
+}
+
 export const BACKFILL_DAYS = 2
 
 /** D4: a check-in may land on today or be backfilled up to two days, never before the habit existed. */

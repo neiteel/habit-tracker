@@ -3,9 +3,19 @@
 import { Await, Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { Suspense, useState } from 'react'
 import { z } from 'zod'
-import { createHabit, getStats, listHabits, toggleHabit } from '../habits'
+import { HabitForm } from '../habit-form'
+import { getStats, listHabits, toggleHabit } from '../habits'
 
 const filters = ['all', 'todo', 'done'] as const
+const unit = { daily: '天', weekly: '週', interval: '次' } as const
+
+type Row = Awaited<ReturnType<typeof listHabits>>[number]
+
+function Progress({ p }: { p: Row['progress'] }) {
+  if (p.kind === 'weekly') return <span>本週 {p.done}/{p.target}</span>
+  if (p.kind === 'interval') return <span>{p.daysLeft === null ? '還沒開始' : p.daysLeft > 0 ? `剩 ${p.daysLeft} 天` : p.daysLeft === 0 ? '今天到期' : '已過期'}</span>
+  return null
+}
 
 export const Route = createFileRoute('/')({
   validateSearch: z.object({ filter: z.enum(filters).default('all').catch('all') }),
@@ -21,12 +31,11 @@ function Today() {
   const { habits, stats } = Route.useLoaderData()
   const { filter } = Route.useSearch()
   const router = useRouter()
-  const [name, setName] = useState('')
   // Ticks show instantly; the server's answer (or a failure) settles them.
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
   const [error, setError] = useState('')
 
-  const toggle = async (h: (typeof habits)[number]) => {
+  const toggle = async (h: Row) => {
     setError('')
     setOptimistic((o) => ({ ...o, [h.id]: !h.checkedInToday }))
     try {
@@ -62,27 +71,20 @@ function Today() {
         {habits.map((h) => (
           <li key={h.id}>
             <input type="checkbox" id={h.id} checked={optimistic[h.id] ?? h.checkedInToday} onChange={() => toggle(h)} />
-            <label htmlFor={h.id}>{h.name}</label>
-            <span>🔥 {h.streak}</span>
+            <label htmlFor={h.id}>
+              {h.name}
+              {h.stackCue && <small className="cue">{h.stackCue}</small>}
+            </label>
+            <Progress p={h.progress} />
+            <span>🔥 {h.streak} {unit[h.progress.kind]}</span>
+            <span aria-label={`剩 ${h.freezesLeft} 張凍結卡`}>❄️×{h.freezesLeft}</span>
             <Link to="/habits/$habitId" params={{ habitId: h.id }}>details</Link>
           </li>
         ))}
         {habits.length === 0 && <li>{filter === 'all' ? '還沒有習慣，在下面新增第一個吧。' : '這裡沒有習慣。'}</li>}
       </ul>
 
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault()
-          await createHabit({ data: { name } })
-          setName('')
-          router.invalidate()
-        }}
-      >
-        <label>
-          New habit <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
-        </label>{' '}
-        <button>Add</button>
-      </form>
+      <HabitForm onSaved={() => router.invalidate()} />
     </>
   )
 }

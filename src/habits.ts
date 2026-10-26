@@ -5,7 +5,8 @@ import { notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 import { requireUser } from './server/auth'
 import { type Habit, db } from './server/db'
-import { DEFAULT_TIME, canCheckIn, computeStreak, localDay } from './streak'
+import { habitInput } from './habit-input'
+import { DEFAULT_TIME, canCheckIn, computeStreak, localDay, progress } from './streak'
 
 const isoDay = z.iso.date()
 // Any string from the client: a malformed id is just a missing habit (404), not a 500.
@@ -14,8 +15,16 @@ const id = z.string().max(64)
 const view = (h: Habit) => {
   const today = localDay(new Date(), DEFAULT_TIME)
   const s = computeStreak({ ...h, today })
-  // doneToday = this period's goal is met; checkedInToday = today's box is ticked (differs for weekly).
-  return { ...h, today, doneToday: s.status === 'done', checkedInToday: h.checkIns.includes(today), streak: s.current }
+  return {
+    ...h,
+    today,
+    // doneToday = this period's goal is met; checkedInToday = today's box is ticked (differs for weekly).
+    doneToday: s.status === 'done',
+    checkedInToday: h.checkIns.includes(today),
+    streak: s.current,
+    freezesLeft: s.freezesLeft,
+    progress: progress(h.schedules.at(-1)!, h.checkIns, today),
+  }
 }
 
 export const listHabits = createServerFn({ method: 'GET' })
@@ -48,10 +57,10 @@ export const getStats = createServerFn({ method: 'GET' }).handler(async () => {
 })
 
 export const createHabit = createServerFn({ method: 'POST' })
-  .validator(z.object({ name: z.string().trim().min(1).max(80) }))
+  .validator(habitInput)
   .handler(async ({ data }) => {
     const user = await requireUser()
-    return view(await db.create(user.id, { name: data.name, createdOn: localDay(new Date(), DEFAULT_TIME) }))
+    return view(await db.create(user.id, { ...data, createdOn: localDay(new Date(), DEFAULT_TIME) }))
   })
 
 export const toggleHabit = createServerFn({ method: 'POST' })

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { canCheckIn, computeStreak, lastNDays, localDay } from './streak.ts'
+import { canCheckIn, computeStreak, lastNDays, localDay, progress } from './streak.ts'
 
 const taipei = (dayStartMinutes = 0) => ({ timeZone: 'Asia/Taipei', dayStartMinutes })
 const la = (dayStartMinutes = 0) => ({ timeZone: 'America/Los_Angeles', dayStartMinutes })
@@ -227,4 +227,19 @@ test('canCheckIn: rejects three days ago and the future', () => {
 })
 test('canCheckIn: rejects days before the habit existed', () => {
   assert.equal(canCheckIn('2026-10-25', '2026-10-26', '2026-10-26'), false)
+})
+
+// --- what the Today row shows for the period in progress ---
+test('progress: weekly counts this ISO week only', () => {
+  const p = progress({ effectiveFrom: '2026-10-01', kind: 'weekly', weeklyTarget: 3 }, ['2026-10-25', '2026-10-26', '2026-10-28'], '2026-10-28')
+  assert.deepEqual(p, { kind: 'weekly', done: 2, target: 3 }) // 10-25 is last week's Sunday
+})
+test('progress: interval counts days left until the window closes', () => {
+  const s = { effectiveFrom: '2026-10-01', kind: 'interval', intervalDays: 3 } as const
+  assert.deepEqual(progress(s, ['2026-10-24'], '2026-10-26'), { kind: 'interval', daysLeft: 1 })
+  assert.deepEqual(progress(s, ['2026-10-23'], '2026-10-26'), { kind: 'interval', daysLeft: 0 }) // due today
+  assert.deepEqual(progress(s, [], '2026-10-26'), { kind: 'interval', daysLeft: null }) // not started
+})
+test('progress: daily has nothing extra to show', () => {
+  assert.deepEqual(progress({ effectiveFrom: '2026-10-01', kind: 'daily' }, [], '2026-10-26'), { kind: 'daily' })
 })

@@ -2,6 +2,7 @@ import '@tanstack/react-start/server-only'
 import { and, asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/neon-http'
 import { z } from 'zod'
+import type { HabitInput } from '../habit-input.ts'
 import type { Schedule } from '../streak.ts'
 import * as schema from './schema.ts'
 
@@ -43,13 +44,14 @@ export const db = {
   async get(userId: string, id: string) {
     return isId(id) ? (await find(userId, id))[0] : undefined
   },
-  async create(userId: string, { name, createdOn }: { name: string; createdOn: string }): Promise<Habit> {
+  async create(userId: string, { name, stackCue, schedule, createdOn }: HabitInput & { createdOn: string }): Promise<Habit> {
     const id = crypto.randomUUID()
+    const first = { ...schedule, effectiveFrom: createdOn }
     await orm.batch([
-      orm.insert(habit).values({ id, userId, name, createdOn }),
-      orm.insert(habitSchedule).values({ habitId: id, effectiveFrom: createdOn, kind: 'daily' }),
+      orm.insert(habit).values({ id, userId, name, stackCue, createdOn }),
+      orm.insert(habitSchedule).values({ habitId: id, ...first }),
     ])
-    return { id, name, stackCue: null, createdOn, schedules: [{ effectiveFrom: createdOn, kind: 'daily' }], checkIns: [] }
+    return { id, name, stackCue: stackCue ?? null, createdOn, schedules: [first], checkIns: [] }
   },
   async toggle(userId: string, id: string, date: string) {
     const h = await db.get(userId, id)
