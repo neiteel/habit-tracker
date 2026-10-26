@@ -155,6 +155,12 @@ export function computeStreak({ createdOn, schedules, checkIns, today }: StreakI
   }
 }
 
+export const BACKFILL_DAYS = 2
+
+/** D4: a check-in may land on today or be backfilled up to two days, never before the habit existed. */
+export const canCheckIn = (date: string, today: string, createdOn: string) =>
+  date <= today && date >= addDays(today, -BACKFILL_DAYS) && date >= createdOn
+
 export function lastNDays(today: string, n: number): string[] {
   return Array.from({ length: n }, (_, i) => addDays(today, i - n + 1))
 }

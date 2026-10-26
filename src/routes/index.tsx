@@ -4,7 +4,6 @@ import { Await, Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { Suspense, useState } from 'react'
 import { z } from 'zod'
 import { createHabit, getStats, listHabits, toggleHabit } from '../habits'
-import { DEFAULT_TIME, localDay } from '../streak'
 
 const filters = ['all', 'todo', 'done'] as const
 
@@ -23,10 +22,21 @@ function Today() {
   const { filter } = Route.useSearch()
   const router = useRouter()
   const [name, setName] = useState('')
+  // Ticks show instantly; the server's answer (or a failure) settles them.
+  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
+  const [error, setError] = useState('')
 
-  const toggle = async (id: string) => {
-    await toggleHabit({ data: { id, date: localDay(new Date(), DEFAULT_TIME) } })
-    router.invalidate()
+  const toggle = async (h: (typeof habits)[number]) => {
+    setError('')
+    setOptimistic((o) => ({ ...o, [h.id]: !h.checkedInToday }))
+    try {
+      await toggleHabit({ data: { id: h.id, date: h.today } })
+      await router.invalidate()
+    } catch {
+      setError(`「${h.name}」沒有記錄成功，請再試一次。`)
+    } finally {
+      setOptimistic(({ [h.id]: _, ...rest }) => rest)
+    }
   }
 
   return (
@@ -47,10 +57,11 @@ function Today() {
         ))}
       </p>
 
+      {error && <p role="alert">{error}</p>}
       <ul>
         {habits.map((h) => (
           <li key={h.id}>
-            <input type="checkbox" id={h.id} checked={h.doneToday} onChange={() => toggle(h.id)} />
+            <input type="checkbox" id={h.id} checked={optimistic[h.id] ?? h.checkedInToday} onChange={() => toggle(h)} />
             <label htmlFor={h.id}>{h.name}</label>
             <span>🔥 {h.streak}</span>
             <Link to="/habits/$habitId" params={{ habitId: h.id }}>details</Link>

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { computeStreak, lastNDays, localDay } from './streak.ts'
+import { canCheckIn, computeStreak, lastNDays, localDay } from './streak.ts'
 
 const taipei = (dayStartMinutes = 0) => ({ timeZone: 'Asia/Taipei', dayStartMinutes })
 const la = (dayStartMinutes = 0) => ({ timeZone: 'America/Los_Angeles', dayStartMinutes })
@@ -215,4 +215,16 @@ test('schedule: a new interval judges the gap from the last check-in under the o
     today: '2026-10-09',
   })
   assert.deepEqual([s.current, s.frozen], [3, []])
+})
+
+// --- which days can be checked in (D4: today, plus backfilling the two days before) ---
+test('canCheckIn: today, yesterday and the day before', () => {
+  for (const d of ['2026-10-26', '2026-10-25', '2026-10-24']) assert.equal(canCheckIn(d, '2026-10-26', '2026-10-01'), true, d)
+})
+test('canCheckIn: rejects three days ago and the future', () => {
+  assert.equal(canCheckIn('2026-10-23', '2026-10-26', '2026-10-01'), false)
+  assert.equal(canCheckIn('2026-10-27', '2026-10-26', '2026-10-01'), false)
+})
+test('canCheckIn: rejects days before the habit existed', () => {
+  assert.equal(canCheckIn('2026-10-25', '2026-10-26', '2026-10-26'), false)
 })

@@ -5,15 +5,17 @@ import { notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 import { requireUser } from './server/auth'
 import { type Habit, db } from './server/db'
-import { DEFAULT_TIME, computeStreak, localDay } from './streak'
+import { DEFAULT_TIME, canCheckIn, computeStreak, localDay } from './streak'
 
 const isoDay = z.iso.date()
 // Any string from the client: a malformed id is just a missing habit (404), not a 500.
 const id = z.string().max(64)
 
 const view = (h: Habit) => {
-  const s = computeStreak({ ...h, today: localDay(new Date(), DEFAULT_TIME) })
-  return { ...h, doneToday: s.status === 'done', streak: s.current }
+  const today = localDay(new Date(), DEFAULT_TIME)
+  const s = computeStreak({ ...h, today })
+  // doneToday = this period's goal is met; checkedInToday = today's box is ticked (differs for weekly).
+  return { ...h, today, doneToday: s.status === 'done', checkedInToday: h.checkIns.includes(today), streak: s.current }
 }
 
 export const listHabits = createServerFn({ method: 'GET' })
@@ -56,9 +58,11 @@ export const toggleHabit = createServerFn({ method: 'POST' })
   .validator(z.object({ id, date: isoDay }))
   .handler(async ({ data }) => {
     const user = await requireUser()
-    const h = await db.toggle(user.id, data.id, data.date)
-    if (!h) throw notFound()
-    return view(h)
+    const habit = await db.get(user.id, data.id)
+    if (!habit) throw notFound()
+    // The client sends the date, so the server decides whether that day is still open.
+    if (!canCheckIn(data.date, localDay(new Date(), DEFAULT_TIME), habit.createdOn)) throw new Error('只能打卡今天，或補簽昨天和前天')
+    return view((await db.toggle(user.id, data.id, data.date))!)
   })
 
 export const deleteHabit = createServerFn({ method: 'POST' })
