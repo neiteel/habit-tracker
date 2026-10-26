@@ -24,16 +24,33 @@ export function localDay(now: Date, { timeZone, dayStartMinutes }: TimeSettings)
   return Number(parts.hour) * 60 + Number(parts.minute) < dayStartMinutes ? addDays(date, -1) : date
 }
 
-/** Consecutive done days ending today, or ending yesterday if today isn't done yet. */
-export function currentStreak(done: Iterable<string>, today: string): number {
-  const set = new Set(done)
-  let cursor = set.has(today) ? today : addDays(today, -1)
-  let n = 0
-  while (set.has(cursor)) {
-    n++
-    cursor = addDays(cursor, -1)
+export type Schedule = { effectiveFrom: string; kind: 'daily' }
+
+export type StreakInput = { createdOn: string; schedules: Schedule[]; checkIns: string[]; today: string }
+export type Streak = { current: number; best: number; status: 'done' | 'pending' }
+
+// Each period becomes one unit: met, closed and missed, or still open.
+type Unit = { type: 'hit' | 'miss' | 'pending' }
+
+function dailyUnits(from: string, today: string, done: Set<string>): Unit[] {
+  const units: Unit[] = []
+  for (let d = from; d <= today; d = addDays(d, 1)) {
+    units.push({ type: done.has(d) ? 'hit' : d === today ? 'pending' : 'miss' })
   }
-  return n
+  return units
+}
+
+/** Streak rules from SPEC-habits §4–§6, derived from check-ins alone so nothing is stored. */
+export function computeStreak({ createdOn, schedules, checkIns, today }: StreakInput): Streak {
+  const done = new Set(checkIns.filter((d) => d >= createdOn && d <= today))
+  const units = dailyUnits(schedules[0]!.effectiveFrom, today, done)
+  let current = 0
+  let best = 0
+  for (const u of units) {
+    if (u.type === 'hit') best = Math.max(best, ++current)
+    else if (u.type === 'miss') current = 0
+  }
+  return { current, best, status: units.at(-1)?.type === 'hit' ? 'done' : 'pending' }
 }
 
 export function lastNDays(today: string, n: number): string[] {

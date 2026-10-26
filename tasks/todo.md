@@ -2,7 +2,7 @@
 
 - [x] T1 修正測試指令
 - [x] T2 localDay 與習慣日
-- [ ] T3 computeStreak：daily
+- [x] T3 computeStreak：daily
 - [ ] T4 weekly 規則
 - [ ] T5 interval 規則
 - [ ] T6 凍結卡與頻率版本

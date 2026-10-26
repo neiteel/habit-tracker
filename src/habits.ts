@@ -4,14 +4,17 @@ import { createServerFn } from '@tanstack/react-start'
 import { notFound } from '@tanstack/react-router'
 import { z } from 'zod'
 import { db } from './server/db'
-import { DEFAULT_TIME, currentStreak, localDay } from './streak'
+import { DEFAULT_TIME, computeStreak, localDay } from './streak'
 
 const isoDay = z.iso.date()
 const id = z.uuid()
 
 const view = (h: NonNullable<ReturnType<typeof db.get>>) => {
   const today = localDay(new Date(), DEFAULT_TIME)
-  return { ...h, doneToday: h.done.includes(today), streak: currentStreak(h.done, today) }
+  const createdOn = localDay(new Date(h.createdAt), DEFAULT_TIME)
+  // shortcut: every in-memory habit is daily; T9 reads the real schedule rows from Neon.
+  const s = computeStreak({ createdOn, schedules: [{ effectiveFrom: createdOn, kind: 'daily' }], checkIns: h.done, today })
+  return { ...h, doneToday: s.status === 'done', streak: s.current }
 }
 
 export const listHabits = createServerFn({ method: 'GET' })
