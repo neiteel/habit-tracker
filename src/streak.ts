@@ -24,7 +24,7 @@ export function localDay(now: Date, { timeZone, dayStartMinutes }: TimeSettings)
   return Number(parts.hour) * 60 + Number(parts.minute) < dayStartMinutes ? addDays(date, -1) : date
 }
 
-export type Schedule = { effectiveFrom: string; kind: 'daily' }
+export type Schedule = { effectiveFrom: string } & ({ kind: 'daily' } | { kind: 'weekly'; weeklyTarget: number })
 
 export type StreakInput = { createdOn: string; schedules: Schedule[]; checkIns: string[]; today: string }
 export type Streak = { current: number; best: number; status: 'done' | 'pending' }
@@ -40,10 +40,27 @@ function dailyUnits(from: string, today: string, done: Set<string>): Unit[] {
   return units
 }
 
+const mondayOf = (iso: string) => addDays(iso, -((new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7))
+
+function weeklyUnits(from: string, today: string, done: Set<string>, target: number): Unit[] {
+  const units: Unit[] = []
+  for (let mon = mondayOf(from); mon <= today; mon = addDays(mon, 7)) {
+    const sun = addDays(mon, 6)
+    const count = [...done].filter((d) => d >= mon && d <= sun).length
+    // The first week only asks for as many days as were left in it.
+    const need = mon < from ? Math.min(target, daysBetween(from, sun) + 1) : target
+    units.push({ type: count >= need ? 'hit' : sun < today ? 'miss' : 'pending' })
+  }
+  return units
+}
+
+const daysBetween = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 86_400_000
+
 /** Streak rules from SPEC-habits §4–§6, derived from check-ins alone so nothing is stored. */
 export function computeStreak({ createdOn, schedules, checkIns, today }: StreakInput): Streak {
   const done = new Set(checkIns.filter((d) => d >= createdOn && d <= today))
-  const units = dailyUnits(schedules[0]!.effectiveFrom, today, done)
+  const s = schedules[0]!
+  const units = s.kind === 'daily' ? dailyUnits(s.effectiveFrom, today, done) : weeklyUnits(s.effectiveFrom, today, done, s.weeklyTarget)
   let current = 0
   let best = 0
   for (const u of units) {

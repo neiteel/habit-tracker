@@ -57,3 +57,44 @@ test('daily: no check-ins yet', () => {
   const s = computeStreak({ createdOn: '2026-10-26', schedules: daily('2026-10-26'), checkIns: [], today: '2026-10-26' })
   assert.deepEqual([s.current, s.best, s.status], [0, 0, 'pending'])
 })
+
+// --- weekly (ISO weeks, Monday first). 2026-10-26 is a Monday. ---
+const weekly = (from: string, weeklyTarget: number) => [{ effectiveFrom: from, kind: 'weekly' as const, weeklyTarget }]
+
+test('weekly: this week below target is pending; met weeks count', () => {
+  const s = computeStreak({
+    createdOn: '2026-10-05', schedules: weekly('2026-10-05', 3),
+    checkIns: ['2026-10-05', '2026-10-07', '2026-10-09', '2026-10-12', '2026-10-13', '2026-10-18', '2026-10-19', '2026-10-21', '2026-10-25', '2026-10-27'],
+    today: '2026-10-28',
+  })
+  assert.equal(s.current, 3)
+  assert.equal(s.status, 'pending')
+})
+test('weekly: reaching the target this week makes it done', () => {
+  const s = computeStreak({
+    createdOn: '2026-10-19', schedules: weekly('2026-10-19', 2),
+    checkIns: ['2026-10-19', '2026-10-20', '2026-10-26', '2026-10-27'], today: '2026-10-28',
+  })
+  assert.deepEqual([s.current, s.status], [2, 'done'])
+})
+test('weekly: a closed week below target breaks the streak', () => {
+  const s = computeStreak({
+    createdOn: '2026-10-12', schedules: weekly('2026-10-12', 3),
+    checkIns: ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-19', '2026-10-20'], today: '2026-10-28',
+  })
+  assert.deepEqual([s.current, s.best], [0, 1])
+})
+test('weekly: the creation week only asks for the days that were left', () => {
+  // Created on Saturday with a target of 3: only Sat + Sun remain, so 2 is enough.
+  const met = computeStreak({ createdOn: '2026-10-24', schedules: weekly('2026-10-24', 3), checkIns: ['2026-10-24', '2026-10-25'], today: '2026-10-26' })
+  assert.equal(met.current, 1)
+  const missed = computeStreak({ createdOn: '2026-10-24', schedules: weekly('2026-10-24', 3), checkIns: ['2026-10-25'], today: '2026-10-26' })
+  assert.equal(missed.current, 0)
+})
+test('weekly: ISO week 2026-W53 spans the new year as one week', () => {
+  const s = computeStreak({
+    createdOn: '2026-12-21', schedules: weekly('2026-12-21', 2),
+    checkIns: ['2026-12-21', '2026-12-23', '2026-12-30', '2027-01-02', '2027-01-05', '2027-01-06'], today: '2027-01-06',
+  })
+  assert.deepEqual([s.current, s.status], [3, 'done'])
+})
