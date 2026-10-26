@@ -6,3 +6,4 @@ dist
 .env
 .env.*
 .playwright-mcp
+!.env.example
