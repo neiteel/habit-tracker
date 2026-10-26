@@ -1,0 +1,21 @@
+# Todo（細節見 [plan.md](plan.md)）
+
+- [x] T1 修正測試指令
+- [x] T2 localDay 與習慣日
+- [ ] T3 computeStreak：daily
+- [ ] T4 weekly 規則
+- [ ] T5 interval 規則
+- [ ] T6 凍結卡與頻率版本
+- [ ] T7 Drizzle + Neon 與 schema
+- [ ] T8 Google 登入與部署驗證 ⚠️
+- [ ] Checkpoint A：基礎（和你確認）
+- [ ] T9 新增習慣並保存到 Neon
+- [ ] T10 打卡並顯示連續紀錄
+- [ ] T11 三種頻率
+- [ ] Checkpoint B：核心流程（和你確認）
+- [ ] T12 詳情頁熱力圖與補簽
+- [ ] T13 編輯與刪除習慣
+- [ ] T14 顯示統計
+- [ ] T15 時間設定
+- [ ] T16 回饋動畫
+- [ ] Checkpoint C：完成（和你審核）
