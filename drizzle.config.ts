@@ -1,6 +1,9 @@
+import { existsSync } from 'node:fs'
 import { defineConfig } from 'drizzle-kit'
 
-// Migrate the test branch with: DATABASE_URL=$DATABASE_URL_TEST pnpm db:migrate
+if (existsSync('.env')) process.loadEnvFile()
+
+// Migrate the test branch with: pnpm db:migrate:test
 export default defineConfig({
   dialect: 'postgresql',
   schema: './src/server/schema.ts',

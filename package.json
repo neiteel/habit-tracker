@@ -8,9 +8,10 @@
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types 'src/**/*.test.ts'",
-    "test:db": "node --test --test-concurrency=1 --experimental-strip-types 'src/**/*.db-test.ts'",
+    "test:db": "node --env-file-if-exists=.env --test --test-concurrency=1 --experimental-strip-types 'src/**/*.db-test.ts'",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:migrate:test": "DATABASE_URL=$(node --env-file=.env -p process.env.DATABASE_URL_TEST) drizzle-kit migrate"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.2.0",
