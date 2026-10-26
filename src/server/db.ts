@@ -3,14 +3,23 @@ import { and, asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/neon-http'
 import { z } from 'zod'
 import type { HabitInput } from '../habit-input.ts'
-import type { Schedule } from '../streak.ts'
+import { DEFAULT_TIME, type Schedule, localDay } from '../streak.ts'
 import * as schema from './schema.ts'
 
 const { habit, habitSchedule, checkIn } = schema
 
 export const orm = drizzle(process.env.DATABASE_URL!, { schema })
 
-export type Habit = { id: string; name: string; stackCue: string | null; createdOn: string; schedules: Schedule[]; checkIns: string[] }
+export type Habit = {
+  id: string
+  name: string
+  stackCue: string | null
+  createdOn: string
+  schedules: Schedule[]
+  checkIns: string[]
+  /** Check-ins recorded on a later local day than the day they count for. */
+  backfilled: string[]
+}
 
 type ScheduleRow = typeof habitSchedule.$inferSelect
 
@@ -26,7 +35,7 @@ async function find(userId: string, id?: string): Promise<Habit[]> {
   const rows = await orm.query.habit.findMany({
     // Every query is scoped to the signed-in user, so one user's ids are useless to another.
     where: id ? and(eq(habit.userId, userId), eq(habit.id, id)) : eq(habit.userId, userId),
-    with: { schedules: true, checkIns: { columns: { onDate: true }, orderBy: asc(checkIn.onDate) } },
+    with: { schedules: true, checkIns: { columns: { onDate: true, createdAt: true }, orderBy: asc(checkIn.onDate) } },
     orderBy: asc(habit.createdAt),
   })
   return rows.map((r) => ({
@@ -36,6 +45,8 @@ async function find(userId: string, id?: string): Promise<Habit[]> {
     createdOn: r.createdOn,
     schedules: r.schedules.map(toSchedule),
     checkIns: r.checkIns.map((c) => c.onDate),
+    // shortcut: judged in DEFAULT_TIME like everything else until T15 adds per-user time zones.
+    backfilled: r.checkIns.filter((c) => localDay(c.createdAt, DEFAULT_TIME) > c.onDate).map((c) => c.onDate),
   }))
 }
 
@@ -51,7 +62,7 @@ export const db = {
       orm.insert(habit).values({ id, userId, name, stackCue, createdOn }),
       orm.insert(habitSchedule).values({ habitId: id, ...first }),
     ])
-    return { id, name, stackCue: stackCue ?? null, createdOn, schedules: [first], checkIns: [] }
+    return { id, name, stackCue: stackCue ?? null, createdOn, schedules: [first], checkIns: [], backfilled: [] }
   },
   // Sets rather than flips: a flip read-then-wrote, so two quick taps could both see "done" and both delete.
   async setCheckIn(userId: string, id: string, date: string, done: boolean) {
@@ -59,8 +70,7 @@ export const db = {
     if (!h) return undefined
     if (done) await orm.insert(checkIn).values({ habitId: id, onDate: date }).onConflictDoNothing()
     else await orm.delete(checkIn).where(and(eq(checkIn.habitId, id), eq(checkIn.onDate, date)))
-    const others = h.checkIns.filter((d) => d !== date)
-    return { ...h, checkIns: done ? [...others, date].sort() : others }
+    return db.get(userId, id)
   },
   async remove(userId: string, id: string) {
     if (!isId(id)) return false

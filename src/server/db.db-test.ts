@@ -87,6 +87,13 @@ test('store: setting a check-in is idempotent, so repeated or concurrent request
   assert.deepEqual((await store.get('u-set', h.id))!.checkIns, [])
 })
 
+test('store: a check-in recorded after its day counts as backfilled', async () => {
+  await newUser('u-backfill')
+  const h = await store.create('u-backfill', { name: 'Read', createdOn: '2026-09-01', schedule: { kind: 'daily' } })
+  const after = await store.setCheckIn('u-backfill', h.id, '2026-09-02', true) // recorded today, long after 09-02
+  assert.deepEqual([after!.checkIns, after!.backfilled], [['2026-09-02'], ['2026-09-02']])
+})
+
 test('store: one user cannot see, check in or delete another user\'s habit', async () => {
   await newUser('u-alice')
   await newUser('u-bob')

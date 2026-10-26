@@ -168,6 +168,44 @@ export function progress(s: Schedule, checkIns: string[], today: string) {
   return { kind: s.kind }
 }
 
+/** Days of a 'YYYY-MM' month in Monday-first weeks, padded with nulls to whole weeks. */
+export function monthGrid(month: string): (string | null)[] {
+  const first = `${month}-01`
+  const days: (string | null)[] = Array(daysBetween(mondayOf(first), first)).fill(null)
+  for (let d = first; d.startsWith(month); d = addDays(d, 1)) days.push(d)
+  while (days.length % 7) days.push(null)
+  return days
+}
+
+/** Expands Streak.frozen keys into calendar dates; a weekly key ('YYYY-Www') covers its whole week. */
+export function frozenDates(frozen: string[]): Set<string> {
+  const out = new Set<string>()
+  for (const key of frozen) {
+    const m = /^(\d{4})-W(\d{2})$/.exec(key)
+    if (!m) {
+      out.add(key)
+      continue
+    }
+    const mon = addDays(mondayOf(`${m[1]}-01-04`), (Number(m[2]) - 1) * 7) // Jan 4 is always in week 1
+    for (let i = 0; i < 7; i++) out.add(addDays(mon, i))
+  }
+  return out
+}
+
+export type DayStatus = 'done' | 'frozen' | 'missed' | 'open' | 'future' | 'before'
+
+export function dayStatus(
+  date: string,
+  { today, createdOn, done, frozen, daily }: { today: string; createdOn: string; done: Set<string>; frozen: Set<string>; daily: boolean },
+): DayStatus {
+  if (date > today) return 'future'
+  if (date < createdOn) return 'before'
+  if (done.has(date)) return 'done'
+  if (frozen.has(date)) return 'frozen'
+  // Only a daily habit misses a single day; weekly and interval goals are judged over periods.
+  return daily && date < today ? 'missed' : 'open'
+}
+
 export const BACKFILL_DAYS = 2
 
 /** D4: a check-in may land on today or be backfilled up to two days, never before the habit existed. */

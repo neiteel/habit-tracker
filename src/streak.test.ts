@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { canCheckIn, computeStreak, lastNDays, localDay, progress } from './streak.ts'
+import { canCheckIn, computeStreak, dayStatus, frozenDates, lastNDays, localDay, monthGrid, progress } from './streak.ts'
 
 const taipei = (dayStartMinutes = 0) => ({ timeZone: 'Asia/Taipei', dayStartMinutes })
 const la = (dayStartMinutes = 0) => ({ timeZone: 'America/Los_Angeles', dayStartMinutes })
@@ -242,4 +242,32 @@ test('progress: interval counts days left until the window closes', () => {
 })
 test('progress: daily has nothing extra to show', () => {
   assert.deepEqual(progress({ effectiveFrom: '2026-10-01', kind: 'daily' }, [], '2026-10-26'), { kind: 'daily' })
+})
+
+// --- calendar on the habit detail page ---
+test('monthGrid: Monday-first weeks, padded with nulls', () => {
+  const g = monthGrid('2026-10') // 2026-10-01 is a Thursday
+  assert.deepEqual(g.slice(0, 4), [null, null, null, '2026-10-01'])
+  assert.equal(g.length % 7, 0)
+  assert.equal(g.filter(Boolean).length, 31)
+  assert.equal(g.at(-1) === null || g.at(-1) === '2026-10-31', true)
+})
+test('monthGrid: February in a leap year', () => {
+  assert.equal(monthGrid('2028-02').filter(Boolean).length, 29)
+})
+test('frozenDates: daily and interval keys are dates; a weekly key covers its whole ISO week', () => {
+  assert.deepEqual([...frozenDates(['2026-10-22'])], ['2026-10-22'])
+  assert.deepEqual([...frozenDates(['2026-W42'])], ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18'])
+  assert.deepEqual([...frozenDates(['2026-W53'])].slice(0, 1), ['2026-12-28'])
+  assert.deepEqual([...frozenDates(['2027-W01'])].slice(0, 1), ['2027-01-04'])
+})
+test('dayStatus: done, frozen, missed (daily only), open, future and before the habit', () => {
+  const ctx = { today: '2026-10-26', createdOn: '2026-10-10', done: new Set(['2026-10-20']), frozen: new Set(['2026-10-21']), daily: true }
+  assert.equal(dayStatus('2026-10-20', ctx), 'done')
+  assert.equal(dayStatus('2026-10-21', ctx), 'frozen')
+  assert.equal(dayStatus('2026-10-22', ctx), 'missed')
+  assert.equal(dayStatus('2026-10-26', ctx), 'open')
+  assert.equal(dayStatus('2026-10-27', ctx), 'future')
+  assert.equal(dayStatus('2026-10-09', ctx), 'before')
+  assert.equal(dayStatus('2026-10-22', { ...ctx, daily: false }), 'open') // weekly/interval days are not misses on their own
 })

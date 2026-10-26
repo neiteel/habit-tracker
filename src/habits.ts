@@ -23,6 +23,7 @@ const view = (h: Habit) => {
     checkedInToday: h.checkIns.includes(today),
     streak: s.current,
     freezesLeft: s.freezesLeft,
+    frozen: s.frozen,
     progress: progress(h.schedules.at(-1)!, h.checkIns, today),
   }
 }
