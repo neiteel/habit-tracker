@@ -6,7 +6,9 @@ export function getRouter() {
     routeTree,
     scrollRestoration: true,
     defaultPreload: 'intent',
-    defaultViewTransition: true, // a 160ms crossfade between pages (styles.css)
+    // A 160ms crossfade between pages (styles.css); a search-only change (tabs, months) swaps in place,
+    // or the old snapshot ghosts over the numbers and stamps animating in.
+    defaultViewTransition: { types: ({ pathChanged }) => (pathChanged ? ['page'] : false) },
     defaultNotFoundComponent: () => <p>Not found.</p>,
     defaultErrorComponent: ({ error }) => <p role="alert">Something went wrong: {error instanceof Error ? error.message : String(error)}</p>,
   })

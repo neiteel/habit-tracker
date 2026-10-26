@@ -54,17 +54,6 @@ export const getHabit = createServerFn({ method: 'GET' })
     return view(h, time)
   })
 
-export const getStats = createServerFn({ method: 'GET' }).handler(async () => {
-  const { user, time } = await userAndTime()
-  const all = (await db.list(user.id)).map((h) => view(h, time))
-  return {
-    total: all.length,
-    doneToday: all.filter((h) => h.doneToday).length,
-    bestStreak: Math.max(0, ...all.map((h) => h.streak)),
-    freezesLeft: all.reduce((n, h) => n + h.freezesLeft, 0),
-  }
-})
-
 export const getTime = createServerFn({ method: 'GET' }).handler(async () => {
   const { time, today } = await userAndTime()
   return { ...time, today }

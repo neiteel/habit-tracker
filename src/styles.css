@@ -308,11 +308,28 @@ button.day[aria-busy='true'] { opacity: 0.5; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* Streak number rolls up when it changes: feedback, tens of times a day, so short and quiet. */
+/* Streak number rolls up when it changes: feedback, a few times a day, so short. A rise also
+   floats a "+1" off it, held long enough (600ms) to read as text. */
 .roll {
   display: inline-block;
-  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
-  @starting-style { transform: translateY(60%); opacity: 0; }
+  position: relative;
+  transition: transform 250ms var(--ease-out), opacity 250ms var(--ease-out);
+  @starting-style { transform: translateY(100%); opacity: 0; }
+}
+.roll.up::after {
+  content: '+1';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%); /* centred even when reduced motion swaps the keyframes */
+  font: 700 0.75rem/1 var(--mono);
+  pointer-events: none;
+  animation: float-up 600ms var(--ease-out) both;
+}
+@keyframes float-up {
+  from { opacity: 1; transform: translate(-50%, 0.4rem); }
+  40% { opacity: 1; }
+  to { opacity: 0; transform: translate(-50%, -0.6rem); }
 }
 
 /* Lines that "print" out of the receipt: revealed top to bottom like paper feeding out. */
@@ -324,14 +341,42 @@ button.day[aria-busy='true'] { opacity: 0.5; }
   @starting-style { clip-path: inset(0 0 100% 0); opacity: 0; }
 }
 .note { color: var(--ink); }
+/* Milestone: a rubber stamp slams onto the receipt, the sheet takes the hit, ink rings out. */
 .milestone {
+  grid-column: 2;
   justify-self: start;
+  position: relative;
+  margin: 0.5rem 0 0;
   font: 700 0.75rem/1 var(--mono);
   letter-spacing: 0.1em;
   padding: 0.55rem 0.75rem;
   border: 1.5px solid var(--ink);
   border-radius: 3px;
   rotate: -2deg; /* a stamp, not a label */
+}
+/* Rare, so this is where the delight budget goes. */
+.milestone.slam { animation: stamp 500ms var(--ease-out) both; }
+.milestone.slam::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  animation: stamp-ring 500ms 200ms var(--ease-out) both;
+}
+@keyframes stamp {
+  0% { opacity: 0; transform: scale(2) rotate(-12deg); }
+  50% { opacity: 1; transform: scale(0.96) rotate(1deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes stamp-ring {
+  from { opacity: 0.6; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.25, 1.8); }
+}
+.sheet:has(.milestone.slam) { animation: thud 250ms 200ms var(--ease-out); }
+@keyframes thud {
+  0%, 100% { transform: none; }
+  30% { transform: translateY(3px); }
 }
 
 /* Bottom sheet for adding a habit (Base UI Drawer): slides up, leaves the same way. */
@@ -365,6 +410,12 @@ button.day[aria-busy='true'] { opacity: 0.5; }
 @media (prefers-reduced-motion: reduce) {
   /* Keep the fades that explain what happened; drop the movement. */
   .roll { @starting-style { transform: none; } }
+  .sheet:has(.milestone.slam) { animation: none; }
+  /* Fades still end, so the one-shot classes still clear. */
+  .roll.up::after, .milestone.slam::after { animation-name: fade-out; }
+  .milestone.slam { animation-name: fade-in; }
+  @keyframes fade-in { from { opacity: 0; } }
+  @keyframes fade-out { to { opacity: 0; } }
   .print { transition: opacity 200ms ease; @starting-style { clip-path: inset(0); } }
   .drawer { transition: opacity 200ms ease; }
   .drawer[data-starting-style], .drawer[data-ending-style] { transform: none; opacity: 0; }

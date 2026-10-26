@@ -1,11 +1,12 @@
 // SSR mode: full (default). The habit list is the page's main content, so it is
-// server-rendered for first paint; the totals are streamed in after the shell.
-import { Await, Link, createFileRoute, useRouter } from '@tanstack/react-router'
+// server-rendered for first paint. All habits load once; the tabs and totals are derived from
+// them, so switching tabs never refetches or flashes placeholders.
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { Drawer } from '@base-ui/react/drawer'
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { HabitForm } from '../habit-form'
-import { getStats, getTime, listHabits, setCheckIn } from '../habits'
+import { getTime, listHabits, setCheckIn } from '../habits'
 import { MILESTONES } from '../streak'
 
 const filters = ['all', 'todo', 'done'] as const
@@ -26,17 +27,17 @@ const printDate = (iso: string) => `${iso.replaceAll('-', '.')} ${weekday.format
 
 export const Route = createFileRoute('/')({
   validateSearch: z.object({ filter: z.enum(filters).default('all').catch('all') }),
-  loaderDeps: ({ search }) => ({ filter: search.filter }),
-  loader: async ({ deps }) => {
-    const [habits, time] = await Promise.all([listHabits({ data: deps }), getTime()])
-    return { habits, today: time.today, stats: getStats() } // stats not awaited: streamed under <Suspense>
+  loader: async () => {
+    const [habits, time] = await Promise.all([listHabits({ data: { filter: 'all' } }), getTime()])
+    return { habits, today: time.today }
   },
   component: Today,
 })
 
 function Today() {
-  const { habits, today, stats } = Route.useLoaderData()
+  const { habits: all, today } = Route.useLoaderData()
   const { filter } = Route.useSearch()
+  const habits = filter === 'all' ? all : all.filter((h) => h.doneToday === (filter === 'done'))
   const router = useRouter()
   // Ticks show instantly and stay until loader data agrees; clearing them when invalidate()
   // resolves flashed the old state back for a few hundred ms.
@@ -45,26 +46,40 @@ function Today() {
   const checked = (h: Row) => optimistic[h.id] ?? h.checkedInToday
 
   // Streaks as last committed to screen. A change rolls the number in, and crossing a milestone in
-  // this session prints a stub; nothing animates on a plain page load. `rolled` keeps the class on
-  // through the re-renders that follow, or the transition would be cut off mid-flight.
+  // this session stamps it; nothing animates on a plain page load. `rolled`/`rose`/`slam` keep the
+  // classes on through the re-renders that follow, then clear when the motion ends, so a row that
+  // remounts on a tab switch shows its final state instead of playing again.
   const shown = useRef<Record<string, number>>({})
   const [rolled, setRolled] = useState<Record<string, number>>({})
+  const [rose, setRose] = useState<Record<string, number>>({}) // streak a habit just rose to, for the "+1"
   const [milestone, setMilestone] = useState<Record<string, number>>({})
+  const [slam, setSlam] = useState<Record<string, boolean>>({})
+  const drop = (id: string) => <T,>({ [id]: _, ...rest }: Record<string, T>) => rest
+  const settled = (id: string) => {
+    setRolled(drop(id))
+    setRose(drop(id))
+  }
   const rolls = (h: Row) => rolled[h.id] === h.streak || (shown.current[h.id] !== undefined && shown.current[h.id] !== h.streak)
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     setOptimistic((o) => {
-      const pending = Object.entries(o).filter(([id, v]) => habits.find((h) => h.id === id)?.checkedInToday !== v)
+      const pending = Object.entries(o).filter(([id, v]) => all.find((h) => h.id === id)?.checkedInToday !== v)
       return pending.length === Object.keys(o).length ? o : Object.fromEntries(pending)
     })
     const prev = shown.current
-    const changed = habits.filter((h) => prev[h.id] !== undefined && prev[h.id] !== h.streak)
+    const changed = all.filter((h) => prev[h.id] !== undefined && prev[h.id] !== h.streak)
     if (changed.length) setRolled((r) => ({ ...r, ...Object.fromEntries(changed.map((h) => [h.id, h.streak])) }))
+    const up = changed.filter((h) => h.streak > prev[h.id]!)
+    if (up.length) setRose((r) => ({ ...r, ...Object.fromEntries(up.map((h) => [h.id, h.streak])) }))
     const reached = changed.filter((h) => h.streak > prev[h.id]! && MILESTONES.includes(h.streak))
-    if (reached.length) setMilestone((m) => ({ ...m, ...Object.fromEntries(reached.map((h) => [h.id, h.streak])) }))
-    shown.current = Object.fromEntries(habits.map((h) => [h.id, h.streak]))
-  }, [habits])
+    if (reached.length) {
+      navigator.vibrate?.([30, 60, 90])
+      setMilestone((m) => ({ ...m, ...Object.fromEntries(reached.map((h) => [h.id, h.streak])) }))
+      setSlam((s) => ({ ...s, ...Object.fromEntries(reached.map((h) => [h.id, true])) }))
+    }
+    shown.current = Object.fromEntries(all.map((h) => [h.id, h.streak]))
+  }, [all])
 
   // One request at a time per habit, so the server ends on the user's last tap.
   const queue = useRef(new Map<string, Promise<unknown>>())
@@ -114,7 +129,15 @@ function Today() {
                   <span className="name">{h.name}</span>
                   <span className="leader" aria-hidden="true" />
                   <span className="value">
-                    <span key={h.streak} className={rolls(h) ? 'roll' : undefined}>{h.streak}</span>{' '}
+                    <span
+                      key={h.streak}
+                      className={rolls(h) ? (rose[h.id] === h.streak ? 'roll up' : 'roll') : undefined}
+                      // A rise waits for its "+1" (an animation) to finish; a drop only has the roll.
+                      onTransitionEnd={() => rose[h.id] !== h.streak && settled(h.id)}
+                      onAnimationEnd={() => settled(h.id)}
+                    >
+                      {h.streak}
+                    </span>{' '}
                     {unit[h.progress.kind]}
                   </span>
                 </label>
@@ -125,8 +148,12 @@ function Today() {
                   <Link to="/habits/$habitId" params={{ habitId: h.id }} aria-label={`${h.name} 明細`}>明細 →</Link>
                 </div>
                 {h.justFrozen && <p className="note print label">{frozenNote[h.progress.kind]}</p>}
-                {milestone[h.id] && (
-                  <p className="milestone print" role="status">★ 連續 {milestone[h.id]} {unit[h.progress.kind]} 達成</p>
+                {milestone[h.id] && h.streak >= milestone[h.id] && (
+                  <p
+                    className={slam[h.id] ? 'milestone slam' : 'milestone'}
+                    role="status"
+                    onAnimationEnd={(e) => e.pseudoElement && setSlam(drop(h.id))} // the ring ends last
+                  >★ 連續 {milestone[h.id]} {unit[h.progress.kind]} 達成</p>
                 )}
               </li>
             ))}
@@ -135,9 +162,7 @@ function Today() {
 
           <hr className="rule" />
 
-          <Suspense fallback={<Totals />}>
-            <Await promise={stats}>{(s) => <Totals s={s} />}</Await>
-          </Suspense>
+          <Totals habits={all} />
 
           <div className="barcode" aria-hidden="true" />
           <p className="footnote meta">每一個勾，都是給明天的自己</p>
@@ -168,15 +193,14 @@ function Today() {
   )
 }
 
-function Totals({ s }: { s?: Awaited<ReturnType<typeof getStats>> }) {
-  const v = (n?: number) => (n === undefined ? '—' : n)
+function Totals({ habits }: { habits: Row[] }) {
   return (
-    <div className="totals" aria-busy={!s}>
-      <div className="line"><span>習慣</span><span className="leader" /><span className="value">{v(s?.total)}</span></div>
-      <div className="line"><span>最長連續</span><span className="leader" /><span className="value">{v(s?.bestStreak)}</span></div>
-      <div className="line"><span>本月凍結卡剩餘</span><span className="leader" /><span className="value">{v(s?.freezesLeft)}</span></div>
+    <div className="totals">
+      <div className="line"><span>習慣</span><span className="leader" /><span className="value">{habits.length}</span></div>
+      <div className="line"><span>最長連續</span><span className="leader" /><span className="value">{Math.max(0, ...habits.map((h) => h.streak))}</span></div>
+      <div className="line"><span>本月凍結卡剩餘</span><span className="leader" /><span className="value">{habits.reduce((n, h) => n + h.freezesLeft, 0)}</span></div>
       <hr className="rule double" />
-      <div className="line grand"><span>今日完成</span><span className="leader" /><span className="value">{s ? `${s.doneToday} / ${s.total}` : '—'}</span></div>
+      <div className="line grand"><span>今日完成</span><span className="leader" /><span className="value">{habits.filter((h) => h.doneToday).length} / {habits.length}</span></div>
     </div>
   )
 }
