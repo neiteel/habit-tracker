@@ -63,15 +63,15 @@ export const createHabit = createServerFn({ method: 'POST' })
     return view(await db.create(user.id, { ...data, createdOn: localDay(new Date(), DEFAULT_TIME) }))
   })
 
-export const toggleHabit = createServerFn({ method: 'POST' })
-  .validator(z.object({ id, date: isoDay }))
+export const setCheckIn = createServerFn({ method: 'POST' })
+  .validator(z.object({ id, date: isoDay, done: z.boolean() }))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const habit = await db.get(user.id, data.id)
     if (!habit) throw notFound()
     // The client sends the date, so the server decides whether that day is still open.
     if (!canCheckIn(data.date, localDay(new Date(), DEFAULT_TIME), habit.createdOn)) throw new Error('只能打卡今天，或補簽昨天和前天')
-    return view((await db.toggle(user.id, data.id, data.date))!)
+    return view((await db.setCheckIn(user.id, data.id, data.date, data.done))!)
   })
 
 export const deleteHabit = createServerFn({ method: 'POST' })

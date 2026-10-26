@@ -78,11 +78,13 @@ test('store: a weekly habit keeps its target and stacking cue', async () => {
   assert.deepEqual([h!.stackCue, h!.schedules], ['after work', [{ effectiveFrom: '2026-10-26', kind: 'weekly', weeklyTarget: 3 }]])
 })
 
-test('store: toggling a day adds then removes the check-in', async () => {
-  await newUser('u-toggle')
-  const h = await store.create('u-toggle', { name: 'Read', createdOn: '2026-10-26', schedule: { kind: 'daily' } })
-  assert.deepEqual((await store.toggle('u-toggle', h.id, '2026-10-26'))!.checkIns, ['2026-10-26'])
-  assert.deepEqual((await store.toggle('u-toggle', h.id, '2026-10-26'))!.checkIns, [])
+test('store: setting a check-in is idempotent, so repeated or concurrent requests agree', async () => {
+  await newUser('u-set')
+  const h = await store.create('u-set', { name: 'Read', createdOn: '2026-10-26', schedule: { kind: 'daily' } })
+  await Promise.all([store.setCheckIn('u-set', h.id, '2026-10-26', true), store.setCheckIn('u-set', h.id, '2026-10-26', true)])
+  assert.deepEqual((await store.get('u-set', h.id))!.checkIns, ['2026-10-26'])
+  await Promise.all([store.setCheckIn('u-set', h.id, '2026-10-26', false), store.setCheckIn('u-set', h.id, '2026-10-26', false)])
+  assert.deepEqual((await store.get('u-set', h.id))!.checkIns, [])
 })
 
 test('store: one user cannot see, check in or delete another user\'s habit', async () => {
@@ -91,7 +93,7 @@ test('store: one user cannot see, check in or delete another user\'s habit', asy
   const h = await store.create('u-alice', { name: 'Alice only', createdOn: '2026-10-26', schedule: { kind: 'daily' } })
   assert.deepEqual(await store.list('u-bob'), [])
   assert.equal(await store.get('u-bob', h.id), undefined)
-  assert.equal(await store.toggle('u-bob', h.id, '2026-10-26'), undefined)
+  assert.equal(await store.setCheckIn('u-bob', h.id, '2026-10-26', true), undefined)
   assert.equal(await store.remove('u-bob', h.id), false)
   assert.deepEqual((await store.get('u-alice', h.id))!.checkIns, []) // untouched
   assert.equal(await store.remove('u-alice', h.id), true)

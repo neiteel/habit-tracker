@@ -53,15 +53,14 @@ export const db = {
     ])
     return { id, name, stackCue: stackCue ?? null, createdOn, schedules: [first], checkIns: [] }
   },
-  async toggle(userId: string, id: string, date: string) {
+  // Sets rather than flips: a flip read-then-wrote, so two quick taps could both see "done" and both delete.
+  async setCheckIn(userId: string, id: string, date: string, done: boolean) {
     const h = await db.get(userId, id)
     if (!h) return undefined
-    if (h.checkIns.includes(date)) {
-      await orm.delete(checkIn).where(and(eq(checkIn.habitId, id), eq(checkIn.onDate, date)))
-      return { ...h, checkIns: h.checkIns.filter((d) => d !== date) }
-    }
-    await orm.insert(checkIn).values({ habitId: id, onDate: date }).onConflictDoNothing()
-    return { ...h, checkIns: [...h.checkIns, date].sort() }
+    if (done) await orm.insert(checkIn).values({ habitId: id, onDate: date }).onConflictDoNothing()
+    else await orm.delete(checkIn).where(and(eq(checkIn.habitId, id), eq(checkIn.onDate, date)))
+    const others = h.checkIns.filter((d) => d !== date)
+    return { ...h, checkIns: done ? [...others, date].sort() : others }
   },
   async remove(userId: string, id: string) {
     if (!isId(id)) return false

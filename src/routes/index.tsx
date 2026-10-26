@@ -1,10 +1,10 @@
 // SSR mode: full (default). The habit list is the page's main content, so it is
 // server-rendered for first paint; slow stats are streamed in after the shell.
 import { Await, Link, createFileRoute, useRouter } from '@tanstack/react-router'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { HabitForm } from '../habit-form'
-import { getStats, listHabits, toggleHabit } from '../habits'
+import { getStats, listHabits, setCheckIn } from '../habits'
 
 const filters = ['all', 'todo', 'done'] as const
 const unit = { daily: '天', weekly: '週', interval: '次' } as const
@@ -31,20 +31,34 @@ function Today() {
   const { habits, stats } = Route.useLoaderData()
   const { filter } = Route.useSearch()
   const router = useRouter()
-  // Ticks show instantly; the server's answer (or a failure) settles them.
+  // Ticks show instantly and stay until loader data agrees; clearing them when invalidate()
+  // resolves flashed the old state back for a few hundred ms.
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
   const [error, setError] = useState('')
+  const checked = (h: Row) => optimistic[h.id] ?? h.checkedInToday
+
+  useEffect(() => {
+    setOptimistic((o) => {
+      const pending = Object.entries(o).filter(([id, v]) => habits.find((h) => h.id === id)?.checkedInToday !== v)
+      return pending.length === Object.keys(o).length ? o : Object.fromEntries(pending)
+    })
+  }, [habits])
+
+  // One request at a time per habit, so the server ends on the user's last tap.
+  const queue = useRef(new Map<string, Promise<unknown>>())
 
   const toggle = async (h: Row) => {
     setError('')
-    setOptimistic((o) => ({ ...o, [h.id]: !h.checkedInToday }))
+    const done = !checked(h)
+    setOptimistic((o) => ({ ...o, [h.id]: done }))
+    const send = (queue.current.get(h.id) ?? Promise.resolve()).catch(() => {}).then(() => setCheckIn({ data: { id: h.id, date: h.today, done } }))
+    queue.current.set(h.id, send)
     try {
-      await toggleHabit({ data: { id: h.id, date: h.today } })
+      await send
       await router.invalidate()
     } catch {
+      setOptimistic(({ [h.id]: _, ...rest }) => rest) // roll back to what the server has
       setError(`「${h.name}」沒有記錄成功，請再試一次。`)
-    } finally {
-      setOptimistic(({ [h.id]: _, ...rest }) => rest)
     }
   }
 
@@ -70,7 +84,7 @@ function Today() {
       <ul>
         {habits.map((h) => (
           <li key={h.id}>
-            <input type="checkbox" id={h.id} checked={optimistic[h.id] ?? h.checkedInToday} onChange={() => toggle(h)} />
+            <input type="checkbox" id={h.id} checked={checked(h)} onChange={() => toggle(h)} />
             <label htmlFor={h.id}>
               {h.name}
               {h.stackCue && <small className="cue">{h.stackCue}</small>}
