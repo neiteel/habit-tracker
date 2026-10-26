@@ -5,7 +5,7 @@
 - [x] T3 computeStreak：daily
 - [x] T4 weekly 規則
 - [x] T5 interval 規則
-- [ ] T6 凍結卡與頻率版本
+- [x] T6 凍結卡與頻率版本
 - [ ] T7 Drizzle + Neon 與 schema
 - [ ] T8 Google 登入與部署驗證 ⚠️
 - [ ] Checkpoint A：基礎（和你確認）

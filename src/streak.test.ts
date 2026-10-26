@@ -41,10 +41,10 @@ test('daily: today not done yet is pending, not broken', () => {
   assert.equal(s.current, 2)
   assert.equal(s.status, 'pending')
 })
-test('daily: a missed past day breaks the streak; best keeps the longer run', () => {
+test('daily: a gap longer than the freezes breaks the streak; best keeps the longer run', () => {
   const s = computeStreak({
     createdOn: '2026-09-01', schedules: daily('2026-09-01'),
-    checkIns: ['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-03'], today: '2026-10-03',
+    checkIns: ['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-05'], today: '2026-10-05', // 10-02 → 10-04 missed
   })
   assert.equal(s.current, 1)
   assert.equal(s.best, 3) // 09-29 → 10-01 crosses the month boundary
@@ -77,10 +77,10 @@ test('weekly: reaching the target this week makes it done', () => {
   })
   assert.deepEqual([s.current, s.status], [2, 'done'])
 })
-test('weekly: a closed week below target breaks the streak', () => {
+test('weekly: closed weeks below target beyond the freezes break the streak', () => {
   const s = computeStreak({
-    createdOn: '2026-10-12', schedules: weekly('2026-10-12', 3),
-    checkIns: ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-19', '2026-10-20'], today: '2026-10-28',
+    createdOn: '2026-10-05', schedules: weekly('2026-10-05', 3),
+    checkIns: ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-19', '2026-10-20'], today: '2026-11-04', // weeks of 10-12, 10-19, 10-26 short
   })
   assert.deepEqual([s.current, s.best], [0, 1])
 })
@@ -106,14 +106,18 @@ test('interval: checking in on day X keeps the streak', () => {
   const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01', '2026-10-04'], today: '2026-10-04' })
   assert.deepEqual([s.current, s.status], [2, 'done'])
 })
-test('interval: checking in on day X+1 starts over', () => {
+test('interval: checking in on day X+1 needs a freeze', () => {
   const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01', '2026-10-05'], today: '2026-10-05' })
+  assert.deepEqual([s.current, s.frozen], [2, ['2026-10-04']])
+})
+test('interval: missing more windows than the freezes starts over', () => {
+  const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01', '2026-10-11'], today: '2026-10-11' })
   assert.deepEqual([s.current, s.best], [1, 1])
 })
 test('interval: the open window is pending until its deadline passes', () => {
   const alive = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01'], today: '2026-10-04' })
   assert.deepEqual([alive.current, alive.status], [1, 'pending'])
-  const lapsed = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01'], today: '2026-10-05' })
+  const lapsed = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01'], today: '2026-10-11' }) // 3 windows closed
   assert.deepEqual([lapsed.current, lapsed.best, lapsed.status], [0, 1, 'pending'])
 })
 test('interval: every on-time check-in counts, even inside one window', () => {
@@ -123,4 +127,92 @@ test('interval: every on-time check-in counts, even inside one window', () => {
 test('interval: nothing to count before the first check-in', () => {
   const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: [], today: '2026-10-09' })
   assert.deepEqual([s.current, s.status], [0, 'pending'])
+})
+
+// --- freezes: 2 per habit per calendar month, only when they cover the whole gap ---
+const range = (from: string, to: string, skip: string[] = []) => {
+  const out: string[] = []
+  for (let d = new Date(from + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= to; d.setUTCDate(d.getUTCDate() + 1)) {
+    const iso = d.toISOString().slice(0, 10)
+    if (!skip.includes(iso)) out.push(iso)
+  }
+  return out
+}
+
+test('freeze: one missed day is covered and does not add to the count', () => {
+  const s = computeStreak({ createdOn: '2026-10-20', schedules: daily('2026-10-20'), checkIns: ['2026-10-20', '2026-10-21', '2026-10-23', '2026-10-24'], today: '2026-10-24' })
+  assert.deepEqual([s.current, s.frozen, s.freezesLeft], [4, ['2026-10-22'], 1])
+})
+test('freeze: a gap longer than the freezes left breaks the streak and spends none', () => {
+  const s = computeStreak({ createdOn: '2026-10-20', schedules: daily('2026-10-20'), checkIns: ['2026-10-20', '2026-10-24'], today: '2026-10-24' })
+  assert.deepEqual([s.current, s.frozen, s.freezesLeft], [1, [], 2])
+})
+test('freeze: the allowance is per calendar month and resets on the 1st', () => {
+  const s = computeStreak({
+    createdOn: '2026-10-01', schedules: daily('2026-10-01'),
+    checkIns: range('2026-10-01', '2026-11-05', ['2026-10-05', '2026-10-15', '2026-10-25', '2026-11-03']), today: '2026-11-05',
+  })
+  // 10-25 is October's third miss, so the streak breaks there; November gets a fresh pair.
+  assert.deepEqual([s.current, s.best, s.frozen, s.freezesLeft], [10, 22, ['2026-10-05', '2026-10-15', '2026-11-03'], 1])
+})
+test('freeze: nothing is spent before there is a streak to protect', () => {
+  const s = computeStreak({ createdOn: '2026-10-20', schedules: daily('2026-10-20'), checkIns: ['2026-10-23'], today: '2026-10-23' })
+  assert.deepEqual([s.current, s.frozen, s.freezesLeft], [1, [], 2])
+})
+test('freeze: a backfilled check-in hands the freeze back', () => {
+  const s = computeStreak({ createdOn: '2026-10-20', schedules: daily('2026-10-20'), checkIns: range('2026-10-20', '2026-10-24'), today: '2026-10-24' })
+  assert.deepEqual([s.current, s.frozen, s.freezesLeft], [5, [], 2])
+})
+test('freeze: weekly covers a whole ISO week', () => {
+  const s = computeStreak({
+    createdOn: '2026-10-05', schedules: weekly('2026-10-05', 2),
+    checkIns: ['2026-10-05', '2026-10-06', '2026-10-13', '2026-10-19', '2026-10-20'], today: '2026-10-26',
+  })
+  assert.deepEqual([s.current, s.frozen, s.status], [2, ['2026-W42'], 'pending'])
+})
+test('freeze: weekly week key across the new year is 2026-W53', () => {
+  const s = computeStreak({
+    createdOn: '2026-12-21', schedules: weekly('2026-12-21', 2),
+    checkIns: ['2026-12-21', '2026-12-22', '2027-01-04', '2027-01-05'], today: '2027-01-06',
+  })
+  assert.deepEqual([s.current, s.frozen], [2, ['2026-W53']])
+})
+test('freeze: interval covers one X-day window, keyed by its deadline', () => {
+  const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01', '2026-10-06'], today: '2026-10-06' })
+  assert.deepEqual([s.current, s.frozen], [2, ['2026-10-04']])
+})
+test('freeze: interval gap of three windows is too long for two freezes', () => {
+  const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01', '2026-10-12'], today: '2026-10-12' })
+  assert.deepEqual([s.current, s.frozen], [1, []])
+})
+
+// --- schedule changes apply going forward (SPEC-habits §6) ---
+test('schedule: changing only the target keeps the streak', () => {
+  const s = computeStreak({
+    createdOn: '2026-10-05',
+    schedules: [{ effectiveFrom: '2026-10-05', kind: 'weekly', weeklyTarget: 3 }, { effectiveFrom: '2026-10-21', kind: 'weekly', weeklyTarget: 2 }],
+    checkIns: ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-19', '2026-10-20'],
+    today: '2026-10-25',
+  })
+  // The week of the change (10-19) is judged by the new target of 2.
+  assert.deepEqual([s.current, s.status], [3, 'done'])
+})
+test('schedule: switching kind starts over, spends no freeze, and best only compares the new kind', () => {
+  const s = computeStreak({
+    createdOn: '2026-10-20',
+    schedules: [{ effectiveFrom: '2026-10-20', kind: 'daily' }, { effectiveFrom: '2026-10-26', kind: 'interval', intervalDays: 2 }],
+    checkIns: ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-24', '2026-10-26'],
+    today: '2026-10-26',
+  })
+  // The daily run (4 days, 10-23 frozen) ends at the switch; the 10-25 gap left behind spends nothing.
+  assert.deepEqual([s.current, s.best, s.frozen, s.freezesLeft], [1, 1, ['2026-10-23'], 1])
+})
+test('schedule: a new interval judges the gap from the last check-in under the old one', () => {
+  const s = computeStreak({
+    createdOn: '2026-10-01',
+    schedules: [{ effectiveFrom: '2026-10-01', kind: 'interval', intervalDays: 3 }, { effectiveFrom: '2026-10-06', kind: 'interval', intervalDays: 5 }],
+    checkIns: ['2026-10-01', '2026-10-04', '2026-10-09'], // 10-04 → 10-09 is 5 days: on time under X=5
+    today: '2026-10-09',
+  })
+  assert.deepEqual([s.current, s.frozen], [3, []])
 })

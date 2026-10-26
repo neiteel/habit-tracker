@@ -73,6 +73,8 @@ create table check_in (
 - 歸屬月份：`daily` 看那一天，`weekly` 看那週的週一，`interval` 看窗口的截止日。
 - **只在能補滿整段空缺時才用卡**：空缺比剩餘卡數多時，紀錄直接斷，一張卡都不扣。
 - 依時間順序由舊到新消耗。
+- **還沒有連續紀錄（current = 0）時不用卡**：避免新習慣還沒開始做，卡就被自動扣光。
+- 換類型時留下的空缺不用卡；換類型之前已經正常使用的卡照樣算數。
 - `interval` 的算法：相鄰兩次打卡相隔 `g` 天（最後一段算到今天），需要 `k = max(0, ceil((g − X) / X))` 張卡。
 - **補簽**：只能補 `today − 2` 到 `today − 1`，而且不能早於 `created_on`，由伺服器驗證。補簽和取消都會觸發重算。
 
@@ -96,7 +98,7 @@ type Schedule = { effectiveFrom: string } &
 
 computeStreak(input: {
   createdOn: string; schedules: Schedule[]; checkIns: string[]; today: string
-}): { current: number; best: number; status: 'done' | 'pending' | 'broken'; frozen: string[]; freezesLeft: number }
+}): { current: number; best: number; status: 'done' | 'pending'; frozen: string[]; freezesLeft: number }
 ```
 `frozen` 的元素是週期代號：`'2026-10-24'`、`'2026-W43'`，或 `interval` 窗口的截止日。
 
