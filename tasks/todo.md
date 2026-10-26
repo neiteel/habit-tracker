@@ -7,16 +7,29 @@
 - [x] T5 interval 規則
 - [x] T6 凍結卡與頻率版本
 - [x] T7 Drizzle + Neon 與 schema
-- [ ] T8 Google 登入與部署驗證 ⚠️（程式碼已完成，等 Google OAuth 金鑰和部署許可）
-- [ ] Checkpoint A：基礎（和你確認）
+- [ ] T8 Google 登入與部署驗證：本機登入已由使用者確認可用（2026-10-26）；剩 Vercel 部署延後（D10）
+- [ ] Checkpoint A：基礎（T1–T8）：部分通過
+  - [x] 測試全部通過（`pnpm test`、`pnpm test:db`）
+  - [x] build 成功（`pnpm build`）
+  - [x] 本機 Google 登入可用（使用者確認）
+  - [ ] Vercel preview 可以登入：延後（D10）
+  - [x] 和使用者確認：使用者回覆「部署晚點再做，繼續」
 - [x] T9 新增習慣並保存到 Neon
 - [x] T10 打卡並顯示連續紀錄
 - [x] T11 三種頻率
-- [ ] Checkpoint B：核心流程（和你確認）
+- [x] Checkpoint B：核心流程（T9–T11）
+  - [x] 測試全部通過
+  - [x] build 成功
+  - [x] 主要流程可用：Playwright 走過新增三種頻率、打卡、重新整理後保留；另外修了連點兩個 bug（`4348ca3`）
+  - [x] 和使用者確認：使用者看過改版後回覆「繼續」
 - [x] T12 詳情頁熱力圖與補簽
 - [x] T13 編輯與刪除習慣
 - [x] T14 顯示統計
 - [x] T15 時間設定
 - [x] T16 回饋動畫
-- [ ] Checkpoint C：完成（和你審核）
+- [ ] Checkpoint C：完成（T12–T16）：等使用者確認
+  - [x] 測試全部通過（53 個單元測試、14 個資料庫測試；`streak.ts` 覆蓋率 100%）
+  - [x] build 成功
+  - [x] SPEC-habits §10 成功標準：Playwright 逐項驗證（補簽、編輯、刪除、統計、時區、動畫、減少動態效果）
+  - [ ] 和使用者審核：用自己的帳號走一遍，回覆「C 通過」或描述問題
 - [x] T17 匯出 JSON（export 模組）
