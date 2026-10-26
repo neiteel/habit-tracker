@@ -98,3 +98,29 @@ test('weekly: ISO week 2026-W53 spans the new year as one week', () => {
   })
   assert.deepEqual([s.current, s.status], [3, 'done'])
 })
+
+// --- interval: check in again within X days of the last check-in ---
+const every = (from: string, intervalDays: number) => [{ effectiveFrom: from, kind: 'interval' as const, intervalDays }]
+
+test('interval: checking in on day X keeps the streak', () => {
+  const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01', '2026-10-04'], today: '2026-10-04' })
+  assert.deepEqual([s.current, s.status], [2, 'done'])
+})
+test('interval: checking in on day X+1 starts over', () => {
+  const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01', '2026-10-05'], today: '2026-10-05' })
+  assert.deepEqual([s.current, s.best], [1, 1])
+})
+test('interval: the open window is pending until its deadline passes', () => {
+  const alive = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01'], today: '2026-10-04' })
+  assert.deepEqual([alive.current, alive.status], [1, 'pending'])
+  const lapsed = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01'], today: '2026-10-05' })
+  assert.deepEqual([lapsed.current, lapsed.best, lapsed.status], [0, 1, 'pending'])
+})
+test('interval: every on-time check-in counts, even inside one window', () => {
+  const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: ['2026-10-01', '2026-10-02'], today: '2026-10-02' })
+  assert.equal(s.current, 2)
+})
+test('interval: nothing to count before the first check-in', () => {
+  const s = computeStreak({ createdOn: '2026-10-01', schedules: every('2026-10-01', 3), checkIns: [], today: '2026-10-09' })
+  assert.deepEqual([s.current, s.status], [0, 'pending'])
+})

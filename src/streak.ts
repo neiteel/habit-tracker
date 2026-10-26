@@ -24,7 +24,11 @@ export function localDay(now: Date, { timeZone, dayStartMinutes }: TimeSettings)
   return Number(parts.hour) * 60 + Number(parts.minute) < dayStartMinutes ? addDays(date, -1) : date
 }
 
-export type Schedule = { effectiveFrom: string } & ({ kind: 'daily' } | { kind: 'weekly'; weeklyTarget: number })
+export type Schedule = { effectiveFrom: string } & (
+  | { kind: 'daily' }
+  | { kind: 'weekly'; weeklyTarget: number }
+  | { kind: 'interval'; intervalDays: number }
+)
 
 export type StreakInput = { createdOn: string; schedules: Schedule[]; checkIns: string[]; today: string }
 export type Streak = { current: number; best: number; status: 'done' | 'pending' }
@@ -54,13 +58,35 @@ function weeklyUnits(from: string, today: string, done: Set<string>, target: num
   return units
 }
 
+// Each check-in is a hit; every whole X-day window that closed before the next one is a miss.
+function intervalUnits(from: string, today: string, done: Set<string>, x: number): Unit[] {
+  const units: Unit[] = []
+  let prev: string | undefined
+  const missesSince = (last: string, until: string) => {
+    for (let i = 1; i < Math.ceil(daysBetween(last, until) / x); i++) units.push({ type: 'miss' })
+  }
+  for (const d of [...done].filter((d) => d >= from).sort()) {
+    if (prev) missesSince(prev, d)
+    units.push({ type: 'hit' })
+    prev = d
+  }
+  if (prev !== today) {
+    if (prev) missesSince(prev, today)
+    units.push({ type: 'pending' })
+  }
+  return units
+}
+
 const daysBetween = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 86_400_000
 
 /** Streak rules from SPEC-habits §4–§6, derived from check-ins alone so nothing is stored. */
 export function computeStreak({ createdOn, schedules, checkIns, today }: StreakInput): Streak {
   const done = new Set(checkIns.filter((d) => d >= createdOn && d <= today))
   const s = schedules[0]!
-  const units = s.kind === 'daily' ? dailyUnits(s.effectiveFrom, today, done) : weeklyUnits(s.effectiveFrom, today, done, s.weeklyTarget)
+  const units =
+    s.kind === 'daily' ? dailyUnits(s.effectiveFrom, today, done)
+    : s.kind === 'weekly' ? weeklyUnits(s.effectiveFrom, today, done, s.weeklyTarget)
+    : intervalUnits(s.effectiveFrom, today, done, s.intervalDays)
   let current = 0
   let best = 0
   for (const u of units) {
