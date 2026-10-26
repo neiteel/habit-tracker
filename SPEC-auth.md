@@ -1,7 +1,7 @@
 # Spec：auth
 
 > 模組 id：`auth` · 依賴：無 · 共用規則見 [SPEC.md](SPEC.md)
-> **D10：magic link 延後**，目前只做 Google 登入。下文關於 magic link 和 Resend 的部分，等恢復時才實作。
+> **D15（取代 D10 對 magic link 的延後）**：恢復 magic link，但**開發環境不寄信**。`sendMagicLink` 在沒有 `RESEND_API_KEY` 時，把登入連結印在 dev server 的 terminal，任何 email 都能登入，Playwright 也能走真正的登入流程。正式環境有 `RESEND_API_KEY` 和已驗證網域時才用 Resend 寄出；沒有的話，正式環境的登入頁只顯示 Google。
 
 ## 目標
 讓一般使用者用最少步驟登入：可以用 Google，或輸入 email 收 magic link，不需要密碼。登入後所有資料都綁定這個使用者。也可以刪除自己的帳號。

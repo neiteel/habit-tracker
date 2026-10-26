@@ -172,4 +172,5 @@ export const toggleCheckIn = createServerFn({ method: 'POST' })
 | D14 | 視覺改為「高級收據」：紙張有陰影、文字是扁平的印刷；樣式移到 `src/styles.css`，用 `?url` 載入 | 2026-10-26 |
 | D12 | UI 元件用 `@base-ui/react` 加純 CSS，不加 Tailwind | 2026-10-26 |
 | D13 | 字體用 Fontsource 自行託管，`?url` 放進 root 的 head links；印章用純黑 | 2026-10-26 |
+| D15 | 恢復 magic link：開發環境把登入連結印在 terminal，不寄信；正式環境有 Resend 金鑰和已驗證網域才寄信，否則只顯示 Google（見 SPEC-auth） | 2026-10-26 |
 | D10 | 延後 magic link 和 `reminders`：這是測試工作流程用的專案，不為排程付 Vercel Pro，也不設定寄件網域。D3 和 D7 的排程部分暫停 | 2026-10-26 |
