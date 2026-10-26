@@ -204,7 +204,7 @@ T1 測試指令修正
 **說明**：照 [SPEC-export.md](../SPEC-export.md) 實作。`reminder` 欄位等 reminders 上線再加。
 **驗收**
 - [x] 匯出只含該使用者的 habit、schedule、check-in 和時間設定，不含其他使用者的資料或任何 token。
-- [ ] `/settings` 按「匯出 JSON」會下載 `habit-tracker-YYYY-MM-DD.json`；失敗時顯示 toast。
+- [x] `/settings` 按「匯出 JSON」會下載 `habit-tracker-YYYY-MM-DD.json`；失敗時顯示 toast。
 **驗證**：`pnpm test:db`；手動在 `/settings` 按一次
 **依賴**：T15
 **檔案**：`src/server/db.ts`、`src/habits.ts`、`src/routes/settings.tsx`
