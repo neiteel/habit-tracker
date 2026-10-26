@@ -4,8 +4,7 @@ import { Await, Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { HabitForm } from '../habit-form'
-import { getStats, listHabits, setCheckIn } from '../habits'
-import { DEFAULT_TIME, localDay } from '../streak'
+import { getStats, getTime, listHabits, setCheckIn } from '../habits'
 
 const filters = ['all', 'todo', 'done'] as const
 const unit = { daily: '天', weekly: '週', interval: '次' } as const
@@ -25,15 +24,15 @@ const printDate = (iso: string) => `${iso.replaceAll('-', '.')} ${weekday.format
 export const Route = createFileRoute('/')({
   validateSearch: z.object({ filter: z.enum(filters).default('all').catch('all') }),
   loaderDeps: ({ search }) => ({ filter: search.filter }),
-  loader: async ({ deps }) => ({
-    habits: await listHabits({ data: deps }),
-    stats: getStats(), // not awaited: streamed to the client and resolved under <Suspense>
-  }),
+  loader: async ({ deps }) => {
+    const [habits, time] = await Promise.all([listHabits({ data: deps }), getTime()])
+    return { habits, today: time.today, stats: getStats() } // stats not awaited: streamed under <Suspense>
+  },
   component: Today,
 })
 
 function Today() {
-  const { habits, stats } = Route.useLoaderData()
+  const { habits, today, stats } = Route.useLoaderData()
   const { filter } = Route.useSearch()
   const router = useRouter()
   // Ticks show instantly and stay until loader data agrees; clearing them when invalidate()
@@ -66,8 +65,6 @@ function Today() {
       setError(`「${h.name}」沒有記錄成功，請再試一次。`)
     }
   }
-
-  const today = habits[0]?.today ?? localDay(new Date(), DEFAULT_TIME)
 
   return (
     <>

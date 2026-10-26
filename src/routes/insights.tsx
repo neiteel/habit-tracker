@@ -1,20 +1,22 @@
-// SSR mode: 'data-only'. Data is fetched on the server during the first request (no
-// client waterfall), but the heatmap labels days in the viewer's locale/timezone, which the
-// server can't know — rendering it there would cause hydration mismatches.
+// SSR mode: 'data-only'. Data is fetched on the server during the first request (no client
+// waterfall); the grid itself renders on the client.
 import { createFileRoute } from '@tanstack/react-router'
-import { listHabits } from '../habits'
-import { DEFAULT_TIME, frozenDates, lastNDays, localDay } from '../streak'
+import { getTime, listHabits } from '../habits'
+import { frozenDates, lastNDays } from '../streak'
 
 export const Route = createFileRoute('/insights')({
   ssr: 'data-only',
-  loader: () => listHabits({ data: { filter: 'all' } }),
+  loader: async () => {
+    const [habits, time] = await Promise.all([listHabits({ data: { filter: 'all' } }), getTime()])
+    return { habits, today: time.today }
+  },
   pendingComponent: () => <p className="meta" aria-busy="true">讀取中…</p>,
   component: Insights,
 })
 
 function Insights() {
-  const habits = Route.useLoaderData()
-  const days = lastNDays(localDay(new Date(), DEFAULT_TIME), 30)
+  const { habits, today } = Route.useLoaderData()
+  const days = lastNDays(today, 30)
   const fmt = new Intl.DateTimeFormat('zh-Hant', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'UTC' })
   return (
     <div className="sheet">

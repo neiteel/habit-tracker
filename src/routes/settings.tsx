@@ -1,24 +1,65 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { useState } from 'react'
+import { getTime, saveDayStart } from '../habits'
+import { toasts } from '../toast'
 
-// Time zone and day-start settings arrive in T15 (SPEC-habits §3).
+const hours = [0, 1, 2, 3, 4, 5, 6]
+
 export const Route = createFileRoute('/settings')({
+  loader: () => getTime(),
   component: Settings,
 })
 
 function Settings() {
   const { user } = Route.useRouteContext()
+  const time = Route.useLoaderData()
+  const router = useRouter()
+  const [pending, setPending] = useState(false)
+  const line = (label: string, value: string) => (
+    <div className="line"><span>{label}</span><span className="leader" /><span className="value">{value}</span></div>
+  )
+
   return (
     <div className="sheet">
-      <section className="receipt" aria-labelledby="settings-title">
+      <section className="receipt stack" aria-labelledby="settings-title">
         <header className="masthead">
           <span className="eyebrow">Account</span>
           <h1 id="settings-title">設定</h1>
         </header>
+        <div className="totals">
+          {line('名稱', user?.name ?? '')}
+          {line('帳號', user?.email ?? '')}
+        </div>
         <hr className="rule" />
         <div className="totals">
-          <div className="line"><span>名稱</span><span className="leader" /><span className="value">{user?.name}</span></div>
-          <div className="line"><span>帳號</span><span className="leader" /><span className="value">{user?.email}</span></div>
+          {line('時區', time.timeZone)}
+          {line('今天', time.today.replaceAll('-', '.'))}
         </div>
+        <label className="field">
+          <span className="label">一天從幾點開始</span>
+          <select
+            value={time.dayStartMinutes}
+            disabled={pending}
+            onChange={async (e) => {
+              const dayStartMinutes = Number(e.target.value)
+              setPending(true)
+              try {
+                await saveDayStart({ data: { dayStartMinutes } })
+                await router.invalidate()
+                toasts.add({ title: '已儲存', description: `${String(dayStartMinutes / 60).padStart(2, '0')}:00 以前的打卡算前一天。` })
+              } catch {
+                toasts.add({ title: '沒有儲存成功', description: '請再試一次。' })
+              } finally {
+                setPending(false)
+              }
+            }}
+          >
+            {hours.map((h) => (
+              <option key={h} value={h * 60}>{h === 0 ? '00:00（午夜）' : `0${h}:00`}</option>
+            ))}
+          </select>
+        </label>
+        <p className="meta">時區跟著這台裝置自動更新。熬夜的話，把一天的開始往後調，凌晨的打卡就會算在前一天。</p>
       </section>
     </div>
   )

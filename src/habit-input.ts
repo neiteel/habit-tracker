@@ -14,3 +14,16 @@ export const habitInput = z.object({
 })
 
 export type HabitInput = z.infer<typeof habitInput>
+
+// Anything Intl can't resolve is not a time zone (also rules out injection-shaped strings).
+export const timeZoneInput = z.string().min(1).max(64).refine((timeZone) => {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone })
+    return true
+  } catch {
+    return false
+  }
+}, '不是有效的時區')
+
+/** Minutes after midnight that still count as yesterday; whole hours, 00:00–06:00 (time_settings check). */
+export const dayStartInput = z.number().int().min(0).max(360).multipleOf(60)

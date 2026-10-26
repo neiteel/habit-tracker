@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { canCheckIn, computeStreak, dayStatus, frozenDates, lastNDays, localDay, monthGrid, progress } from './streak.ts'
+import { backfilledDays, canCheckIn, computeStreak, dayStatus, frozenDates, lastNDays, localDay, monthGrid, progress } from './streak.ts'
 
 const taipei = (dayStartMinutes = 0) => ({ timeZone: 'Asia/Taipei', dayStartMinutes })
 const la = (dayStartMinutes = 0) => ({ timeZone: 'America/Los_Angeles', dayStartMinutes })
@@ -270,4 +270,16 @@ test('dayStatus: done, frozen, missed (daily only), open, future and before the 
   assert.equal(dayStatus('2026-10-27', ctx), 'future')
   assert.equal(dayStatus('2026-10-09', ctx), 'before')
   assert.equal(dayStatus('2026-10-22', { ...ctx, daily: false }), 'open') // weekly/interval days are not misses on their own
+})
+
+// --- backfill marks follow the user's own clock ---
+test('backfilledDays: a check-in recorded on a later local day is a backfill', () => {
+  const recordedAt = { '2026-10-25': new Date('2026-10-25T20:00:00Z'), '2026-10-24': new Date('2026-10-24T03:00:00Z') }
+  // 10-25 20:00Z is already 10-26 04:00 in Taipei, but still 10-25 in Los Angeles.
+  assert.deepEqual(backfilledDays(recordedAt, taipei()), ['2026-10-25'])
+  assert.deepEqual(backfilledDays(recordedAt, la()), [])
+})
+test('backfilledDays: respects the day start', () => {
+  // Taipei 10-26 01:00 with a 04:00 day start is still the 10-25 habit day: on time, not a backfill.
+  assert.deepEqual(backfilledDays({ '2026-10-25': new Date('2026-10-25T17:00:00Z') }, taipei(240)), [])
 })

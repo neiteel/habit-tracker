@@ -1,12 +1,12 @@
 import '@tanstack/react-start/server-only'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/neon-http'
 import { z } from 'zod'
 import type { HabitInput } from '../habit-input.ts'
-import { DEFAULT_TIME, type Schedule, localDay } from '../streak.ts'
+import type { Schedule, TimeSettings } from '../streak.ts'
 import * as schema from './schema.ts'
 
-const { habit, habitSchedule, checkIn } = schema
+const { habit, habitSchedule, checkIn, timeSettings } = schema
 
 export const orm = drizzle(process.env.DATABASE_URL!, { schema })
 
@@ -17,8 +17,8 @@ export type Habit = {
   createdOn: string
   schedules: Schedule[]
   checkIns: string[]
-  /** Check-ins recorded on a later local day than the day they count for. */
-  backfilled: string[]
+  /** When each check-in was written, to tell backfills apart (judged in the user's zone, not here). */
+  recordedAt: Record<string, Date>
 }
 
 type ScheduleRow = typeof habitSchedule.$inferSelect
@@ -45,8 +45,7 @@ async function find(userId: string, id?: string): Promise<Habit[]> {
     createdOn: r.createdOn,
     schedules: r.schedules.map(toSchedule),
     checkIns: r.checkIns.map((c) => c.onDate),
-    // shortcut: judged in DEFAULT_TIME like everything else until T15 adds per-user time zones.
-    backfilled: r.checkIns.filter((c) => localDay(c.createdAt, DEFAULT_TIME) > c.onDate).map((c) => c.onDate),
+    recordedAt: Object.fromEntries(r.checkIns.map((c) => [c.onDate, c.createdAt])),
   }))
 }
 
@@ -62,7 +61,7 @@ export const db = {
       orm.insert(habit).values({ id, userId, name, stackCue, createdOn }),
       orm.insert(habitSchedule).values({ habitId: id, ...first }),
     ])
-    return { id, name, stackCue: stackCue ?? null, createdOn, schedules: [first], checkIns: [], backfilled: [] }
+    return { id, name, stackCue: stackCue ?? null, createdOn, schedules: [first], checkIns: [], recordedAt: {} }
   },
   // Sets rather than flips: a flip read-then-wrote, so two quick taps could both see "done" and both delete.
   async setCheckIn(userId: string, id: string, date: string, done: boolean) {
@@ -90,6 +89,34 @@ export const db = {
       ])
     }
     return db.get(userId, id)
+  },
+  async timeSettings(userId: string): Promise<TimeSettings | undefined> {
+    const [row] = await orm
+      .select({ timeZone: timeSettings.timeZone, dayStartMinutes: timeSettings.dayStartMinutes })
+      .from(timeSettings)
+      .where(eq(timeSettings.userId, userId))
+    return row
+  },
+  async saveTimeSettings(userId: string, change: Partial<TimeSettings>) {
+    await orm
+      .insert(timeSettings)
+      .values({ userId, timeZone: change.timeZone ?? 'UTC', dayStartMinutes: change.dayStartMinutes ?? 0 })
+      .onConflictDoUpdate({ target: timeSettings.userId, set: { ...change, updatedAt: new Date() } })
+  },
+  /**
+   * Records the zone a device reports. `from` is set only for the one call that actually changed an
+   * existing zone: read-compare-write in one locked statement, so two tabs can't both report it.
+   */
+  async syncTimeZone(userId: string, timeZone: string): Promise<{ saved: boolean; from: string | undefined }> {
+    const created = await orm.insert(timeSettings).values({ userId, timeZone }).onConflictDoNothing().returning({ userId: timeSettings.userId })
+    if (created.length) return { saved: true, from: undefined }
+    const { rows } = await orm.execute<{ from: string }>(sql`
+      with prev as (select time_zone from time_settings where user_id = ${userId} for update)
+      update time_settings set time_zone = ${timeZone}, updated_at = now()
+      from prev
+      where time_settings.user_id = ${userId} and prev.time_zone <> ${timeZone}
+      returning prev.time_zone as "from"`)
+    return rows.length ? { saved: true, from: rows[0]!.from } : { saved: false, from: undefined }
   },
   async remove(userId: string, id: string) {
     if (!isId(id)) return false

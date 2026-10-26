@@ -2,9 +2,8 @@
 // only because a calendar date has no time zone.
 export type TimeSettings = { timeZone: string; dayStartMinutes: number }
 
-// shortcut: one fixed zone for server and client alike, so SSR and the browser agree on "today";
-// replace with the user's time_settings row in T15.
-export const DEFAULT_TIME: TimeSettings = { timeZone: 'Asia/Taipei', dayStartMinutes: 0 }
+// Only until the browser reports its zone on the very first visit (see syncTimeZone).
+export const FALLBACK_TIME: TimeSettings = { timeZone: 'UTC', dayStartMinutes: 0 }
 
 const addDays = (iso: string, n: number) => {
   const d = new Date(iso + 'T00:00:00Z')
@@ -205,6 +204,10 @@ export function dayStatus(
   // Only a daily habit misses a single day; weekly and interval goals are judged over periods.
   return daily && date < today ? 'missed' : 'open'
 }
+
+/** Check-ins recorded on a later habit day than the one they count for, by the user's own clock. */
+export const backfilledDays = (recordedAt: Record<string, Date>, time: TimeSettings) =>
+  Object.entries(recordedAt).filter(([day, at]) => localDay(at, time) > day).map(([day]) => day).sort()
 
 export const BACKFILL_DAYS = 2
 

@@ -87,11 +87,31 @@ test('store: setting a check-in is idempotent, so repeated or concurrent request
   assert.deepEqual((await store.get('u-set', h.id))!.checkIns, [])
 })
 
-test('store: a check-in recorded after its day counts as backfilled', async () => {
-  await newUser('u-backfill')
-  const h = await store.create('u-backfill', { name: 'Read', createdOn: '2026-09-01', schedule: { kind: 'daily' } })
-  const after = await store.setCheckIn('u-backfill', h.id, '2026-09-02', true) // recorded today, long after 09-02
-  assert.deepEqual([after!.checkIns, after!.backfilled], [['2026-09-02'], ['2026-09-02']])
+test('store: each check-in carries the instant it was recorded', async () => {
+  await newUser('u-recorded')
+  const h = await store.create('u-recorded', { name: 'Read', createdOn: '2026-09-01', schedule: { kind: 'daily' } })
+  const before = Date.now()
+  const after = await store.setCheckIn('u-recorded', h.id, '2026-09-02', true)
+  assert.ok(Math.abs(after!.recordedAt['2026-09-02']!.getTime() - before) < 60_000)
+})
+
+test('store: time settings are created once, then updated in place', async () => {
+  await newUser('u-time')
+  assert.equal(await store.timeSettings('u-time'), undefined)
+  await store.saveTimeSettings('u-time', { timeZone: 'Asia/Taipei' })
+  await store.saveTimeSettings('u-time', { dayStartMinutes: 240 })
+  assert.deepEqual(await store.timeSettings('u-time'), { timeZone: 'Asia/Taipei', dayStartMinutes: 240 })
+  await store.saveTimeSettings('u-time', { timeZone: 'America/Los_Angeles' })
+  assert.deepEqual(await store.timeSettings('u-time'), { timeZone: 'America/Los_Angeles', dayStartMinutes: 240 })
+})
+
+test('store: syncing a zone reports a change once, even when two tabs report it at the same time', async () => {
+  await newUser('u-sync')
+  assert.deepEqual(await store.syncTimeZone('u-sync', 'Asia/Taipei'), { saved: true, from: undefined }) // first visit
+  assert.deepEqual(await store.syncTimeZone('u-sync', 'Asia/Taipei'), { saved: false, from: undefined }) // nothing new
+  const both = await Promise.all([store.syncTimeZone('u-sync', 'America/Los_Angeles'), store.syncTimeZone('u-sync', 'America/Los_Angeles')])
+  assert.deepEqual(both.map((r) => r.from).sort(), ['Asia/Taipei', undefined])
+  assert.equal((await store.timeSettings('u-sync'))!.timeZone, 'America/Los_Angeles')
 })
 
 test('store: editing renames and changes the cue; an unchanged schedule adds no version', async () => {
