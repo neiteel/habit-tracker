@@ -72,4 +72,4 @@ SPEC*.md, tasks/     specs (Traditional Chinese) and the build plan
 
 ## License
 
-Private project; no license granted.
+Released under the [MIT License](LICENSE).

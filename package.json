@@ -1,6 +1,7 @@
 {
   "name": "habit-tracker",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
